@@ -2,12 +2,15 @@ package caretta
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"hash/fnv"
 	"log"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/groundcover-com/caretta/pkg/health"
 	caretta_k8s "github.com/groundcover-com/caretta/pkg/k8s"
 	"github.com/groundcover-com/caretta/pkg/metrics"
 	"github.com/prometheus/client_golang/prometheus"
@@ -32,91 +35,98 @@ var (
 )
 
 type Caretta struct {
-	stopSignal    chan bool
 	tracer        LinksTracer
 	metricsServer *http.Server
+	health        *health.Checker
 	config        carettaConfig
+	cancelPoll    context.CancelFunc
+	pollDone      chan struct{}
 }
 
 func NewCaretta() *Caretta {
 	return &Caretta{
-		stopSignal: make(chan bool, 1),
-		config:     readConfig(),
+		config: readConfig(),
 	}
 }
 
-func (caretta *Caretta) Start() {
-	metricsServer, err := metrics.StartMetricsServer(caretta.config.prometheusEndpoint, caretta.config.prometheusPort)
+func (caretta *Caretta) Start() error {
+	pollInterval := time.Duration(caretta.config.pollingIntervalSeconds) * time.Second
+	caretta.health = health.NewChecker(max(3*pollInterval, 30*time.Second))
+
+	metricsServer, err := metrics.StartMetricsServer(caretta.config.prometheusEndpoint, caretta.config.prometheusPort, caretta.health)
 	if err != nil {
-		log.Fatalf("Error starting Prometheus server: %v", err)
+		return fmt.Errorf("starting Prometheus server: %w", err)
 	}
 	caretta.metricsServer = metricsServer
 
 	clientset, err := caretta.getClientSet()
 	if err != nil {
-		log.Fatalf("Error getting kubernetes clientset: %v", err)
+		return fmt.Errorf("getting kubernetes clientset: %w", err)
 	}
 	resolver, err := caretta_k8s.NewK8sIPResolver(clientset, caretta.config.shouldResolveDns, caretta.config.traverseUpHierarchy)
 	if err != nil {
-		log.Fatalf("Error creating resolver: %v", err)
+		return fmt.Errorf("creating resolver: %w", err)
 	}
-	err = resolver.StartWatching()
-	if err != nil {
-		log.Fatalf("Error watching cluster's state: %v", err)
+	// Returns only after the initial cluster snapshot has been listed.
+	if err := resolver.StartWatching(); err != nil {
+		return fmt.Errorf("watching cluster's state: %w", err)
 	}
-
-	// wait for resolver to populate
-	time.Sleep(10 * time.Second)
 
 	caretta.tracer = NewTracer(resolver)
-	err = caretta.tracer.Start()
-	if err != nil {
-		log.Fatalf("Couldn't load probes - %v", err)
+	if err := caretta.tracer.Start(); err != nil {
+		return fmt.Errorf("loading probes: %w", err)
 	}
+	caretta.health.MarkReady()
 
-	pollingTicker := time.NewTicker(time.Duration(caretta.config.pollingIntervalSeconds) * time.Second)
-
-	pastLinks := make(map[NetworkLink]uint64)
-
-	go func() {
-		for {
-			select {
-			case <-caretta.stopSignal:
-				return
-			case <-pollingTicker.C:
-				var links map[NetworkLink]uint64
-				var tcpConnections []TcpConnection
-
-				if err != nil {
-					log.Printf("Error updating snapshot of cluster state, skipping iteration")
-					continue
-				}
-
-				pastLinks, links, tcpConnections = caretta.tracer.TracesPollingIteration(pastLinks)
-				for link, throughput := range links {
-					caretta.handleLink(&link, throughput)
-				}
-
-				for _, connection := range tcpConnections {
-					caretta.handleTcpConnection(&connection)
-				}
-			}
-		}
-	}()
+	pollCtx, cancel := context.WithCancel(context.Background())
+	caretta.cancelPoll = cancel
+	caretta.pollDone = make(chan struct{})
+	go caretta.pollLoop(pollCtx, pollInterval)
+	return nil
 }
 
-func (caretta *Caretta) Stop() {
-	log.Print("Stopping Caretta...")
-	caretta.stopSignal <- true
-	err := caretta.tracer.Stop()
-	if err != nil {
-		log.Printf("Error unloading bpf objects: %v", err)
+func (caretta *Caretta) pollLoop(ctx context.Context, interval time.Duration) {
+	defer close(caretta.pollDone)
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	pastLinks := make(map[NetworkLink]uint64)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			var links map[NetworkLink]uint64
+			var tcpConnections []TcpConnection
+			pastLinks, links, tcpConnections = caretta.tracer.TracesPollingIteration(pastLinks)
+			for link, throughput := range links {
+				caretta.handleLink(&link, throughput)
+			}
+			for _, connection := range tcpConnections {
+				caretta.handleTcpConnection(&connection)
+			}
+			caretta.health.Heartbeat()
+		}
 	}
-	err = caretta.metricsServer.Shutdown(context.Background())
-	if err != nil {
-		log.Printf("Error shutting Prometheus server down: %v", err)
+}
+
+func (caretta *Caretta) Stop(ctx context.Context) error {
+	log.Print("Stopping Caretta...")
+	caretta.cancelPoll()
+	select {
+	case <-caretta.pollDone: // never close BPF maps while an iteration is reading them
+	case <-ctx.Done():
+		return fmt.Errorf("poll loop did not stop: %w", ctx.Err())
 	}
 
+	var errs []error
+	if err := caretta.tracer.Stop(); err != nil {
+		errs = append(errs, fmt.Errorf("unloading bpf objects: %w", err))
+	}
+	if err := caretta.metricsServer.Shutdown(ctx); err != nil {
+		errs = append(errs, fmt.Errorf("shutting Prometheus server down: %w", err))
+	}
+	return errors.Join(errs...)
 }
 
 func (caretta *Caretta) handleLink(link *NetworkLink, throughput uint64) {

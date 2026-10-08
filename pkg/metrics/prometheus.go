@@ -7,12 +7,15 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/groundcover-com/caretta/pkg/health"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-func StartMetricsServer(endpoint string, port string) (*http.Server, error) {
+func StartMetricsServer(endpoint string, port string, hc *health.Checker) (*http.Server, error) {
 	mux := http.NewServeMux()
 	mux.Handle(endpoint, promhttp.Handler())
+	mux.HandleFunc("/livez", hc.Livez)
+	mux.HandleFunc("/readyz", hc.Readyz)
 
 	listener, err := net.Listen("tcp", port)
 	if err != nil {

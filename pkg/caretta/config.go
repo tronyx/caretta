@@ -40,7 +40,7 @@ func readConfig() carettaConfig {
 	interval := defaultPollingIntervalSeconds
 	if val := os.Getenv("POLL_INTERVAL"); val != "" {
 		valInt, err := strconv.Atoi(val)
-		if err == nil {
+		if err == nil && valInt > 0 {
 			interval = valInt
 		}
 	}
