@@ -1,3 +1,6 @@
+> [!NOTE]
+> **This is a maintained fork of [groundcover-com/caretta](https://github.com/groundcover-com/caretta)**, which hasn't had a release since v0.0.17 in March 2025. It keeps Caretta current and secure: up-to-date dependencies and container images (each pinned to an explicit version, never `latest`), hardened security defaults, and reliability fixes. It's published as `ghcr.io/tronyx/caretta` and `docker.io/tronyx/caretta`, with the Helm chart at `oci://ghcr.io/tronyx/charts/caretta`. See the [changelog](CHANGELOG.md) for what's changed. Caretta was created by [groundcover](https://www.groundcover.com); this fork isn't affiliated with them.
+
 <div align="center">
   <h1>Caretta</h1>
   <p align="center">
