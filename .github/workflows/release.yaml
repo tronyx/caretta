@@ -45,24 +45,12 @@ jobs:
             docker.io/tronyx/caretta:${{ github.ref_name }}
           platforms: linux/arm64,linux/amd64
       -
-        name: Checkout Helm Repo
-        uses: actions/checkout@v7
-        with:
-          path: helm-repo
-          repository: groundcover-com/charts
-          token: ${{ secrets.HELM_CHARTS_REPO_KEY }}
-      -
         name: Publish Chart
-        working-directory: helm-repo
         env:
-          GITHUB_TAG: ${{ github.ref_name	 }}
+          GITHUB_TAG: ${{ github.ref_name }}
         run: |
           version=${GITHUB_TAG#v}
-          helm lint ../chart
-          helm package --version ${version} --app-version ${GITHUB_TAG} ../chart
-          helm repo index --url https://helm.groundcover.com .
-          git config user.name "ci-groundcover"
-          git config user.email "ci@groundcover.com"
-          git add .
-          git commit -m "Added caretta ${version} chart"
-          git push
+          helm lint chart
+          helm package --version "${version}" --app-version "${GITHUB_TAG}" chart
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
+          helm push "caretta-${version}.tgz" oci://ghcr.io/tronyx/charts
