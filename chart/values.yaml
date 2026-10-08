@@ -8,8 +8,10 @@ rbac:
   pspEnabled: true
   sccEnabled: true
 image:
-  repository: quay.io/groundcover/caretta
-  pullPolicy: Always
+  # Also published as docker.io/tronyx/caretta
+  repository: ghcr.io/tronyx/caretta
+  pullPolicy: IfNotPresent
+  # Defaults to the chart appVersion; never use "latest"
   tag: ""
 
 imagePullSecrets: []
@@ -35,18 +37,28 @@ serviceAccount:
 
 podAnnotations: {}
 
-podSecurityContext: {}
-  # fsGroup: 2000
+podSecurityContext:
+  seccompProfile:
+    type: RuntimeDefault
 
+# Root is required to attach kprobes/tracepoints, so lock it down to the minimum capabilities instead.
 securityContext:
-  privileged: true
+  privileged: false
+  runAsUser: 0
+  runAsNonRoot: false
+  allowPrivilegeEscalation: false
   readOnlyRootFilesystem: true
-  # capabilities:
-  #   drop:
-  #   - ALL
-  # readOnlyRootFilesystem: true
-  # runAsNonRoot: true
-  # runAsUser: 1000
+  capabilities:
+    drop:
+      - ALL
+    # SYS_RESOURCE is only needed on kernels < 5.11; replace BPF/PERFMON with SYS_ADMIN on kernels < 5.8
+    add:
+      - BPF
+      - PERFMON
+      - SYS_RESOURCE
+
+# Host tracefs mount used to resolve tracepoint IDs
+tracefsPath: /sys/kernel/tracing
 
 tolerations:
   - key: node-role.kubernetes.io/control-plane
@@ -63,7 +75,9 @@ priorityClassName:
 victoria-metrics-single:
   server:
     image:
-      repository: quay.io/groundcover/victoria-metrics
+      registry: docker.io
+      repository: victoriametrics/victoria-metrics
+      tag: v1.153.0
     resources:
       limits:
         cpu: 300m
@@ -108,7 +122,28 @@ victoria-metrics-single:
 
 grafana:
   image:
-    repository: quay.io/groundcover/grafana
+    registry: docker.io
+    repository: grafana/grafana
+    tag: 13.2.3-distroless
+  testFramework:
+    image:
+      registry: docker.io
+      repository: bats/bats
+      tag: 1.14.0
+  initChownData:
+    image:
+      registry: docker.io
+      repository: library/busybox
+      tag: 1.38.0
+  downloadDashboardsImage:
+    registry: docker.io
+    repository: curlimages/curl
+    tag: 8.22.0
+  imageRenderer:
+    image:
+      registry: docker.io
+      repository: grafana/grafana-image-renderer
+      tag: v5.12.5
   resources:
     limits:
       memory: 300Mi
@@ -127,6 +162,10 @@ grafana:
         editable: "true"
 
   sidecar:
+    image:
+      registry: quay.io
+      repository: kiwigrid/k8s-sidecar
+      tag: 2.14.1
     dashboards:
       label: grafana_dashboard
       labelValue: ""

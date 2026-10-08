@@ -37,10 +37,9 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           volumeMounts:
-            - mountPath: /proc
-              name: proc
-            - mountPath: /sys/kernel/debug
-              name: debug
+            - mountPath: /sys/kernel/tracing
+              name: tracefs
+              readOnly: true
           ports:
             - name: prom-metrics
               containerPort: {{ .Values.prometheusPort }}
@@ -71,9 +70,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       volumes:
-        - name: proc
+        - name: tracefs
           hostPath:
-            path: /proc
-        - name: debug
-          hostPath:
-            path: /sys/kernel/debug
+            path: {{ .Values.tracefsPath }}
+            type: Directory

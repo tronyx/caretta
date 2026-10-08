@@ -10,24 +10,24 @@
 char __license[] SEC("license") = "Dual MIT/GPL";
 
 // internal kernel-only map to hold state for each sock observed.
-struct bpf_map_def SEC("maps") sock_infos = {
-    .type = BPF_MAP_TYPE_HASH,
-    .key_size = sizeof(struct sock *),
-    .value_size = sizeof(struct sock_info),
-    .max_entries = MAX_CONNECTIONS,
-};
+struct {
+  __uint(type, BPF_MAP_TYPE_HASH);
+  __uint(key_size, sizeof(struct sock *));
+  __type(value, struct sock_info);
+  __uint(max_entries, MAX_CONNECTIONS);
+} sock_infos SEC(".maps");
 
 // the main product of the tracing - map containing all connections observed,
 // with metadata and throughput stats.
 // key is a whole identifier struct and not a single id to split the constant
 // and dynamic values and to resemble as closely as possible the end result in
 // the userspace code.
-struct bpf_map_def SEC("maps") connections = {
-    .type = BPF_MAP_TYPE_HASH,
-    .key_size = sizeof(struct connection_identifier),
-    .value_size = sizeof(struct connection_throughput_stats),
-    .max_entries = MAX_CONNECTIONS,
-};
+struct {
+  __uint(type, BPF_MAP_TYPE_HASH);
+  __type(key, struct connection_identifier);
+  __type(value, struct connection_throughput_stats);
+  __uint(max_entries, MAX_CONNECTIONS);
+} connections SEC(".maps");
 
 // helper to convert short int from BE to LE
 static inline u16 be_to_le(__be16 be) { return (be >> 8) | (be << 8); }

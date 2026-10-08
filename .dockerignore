@@ -1,0 +1,8 @@
+.git
+.github
+bin/
+chart/
+images/
+vendor/
+*_bpfel.go
+*_bpfel.o
