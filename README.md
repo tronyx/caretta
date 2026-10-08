@@ -75,7 +75,9 @@ helm delete caretta --namespace caretta
 Note that if persistent storage was enabled in the installation, it may not be deleted automatically by this command.
 
 ## Requirements
-* Linux kernel version >= 4.16
+* Linux kernel version >= 5.8 with the default `securityContext` (uses the `BPF` and `PERFMON` capabilities). On kernels 4.16–5.7, replace those capabilities with `SYS_ADMIN` in **securityContext.capabilities.add**.
+* tracefs available on the host at `/sys/kernel/tracing` (override with **tracefsPath**, e.g. `/sys/kernel/debug/tracing`).
+* The namespace must allow privileged workloads under Pod Security Admission (`pod-security.kubernetes.io/enforce: privileged`).
 * <a href="https://nakryiko.com/posts/bpf-portability-and-co-re/">CO-RE</a> support. Supported linux distributions can be found <a href="https://github.com/libbpf/libbpf#bpf-co-re-compile-once--run-everywhere">here</a>. Specifically, Docker for Mac uses a distribution which is not currently supported.
 
 
