@@ -51,6 +51,7 @@ Useful values:
 * **pollIntervalSeconds** can be modified to specify the polling and publishing interval of new metrics from the kernel. *default: 5*
 * The built-in Victoria Metrics and Grafana instances can be disabled by changing the values **victoria-metrics-single.enabled** or **grafana.enabled** to false, accordingly. _default: true_
 * Caretta resolves Kubernetes entities to their owners by default. For example, a pod 'pod1' and another pod 'pod2' both belonging to a deployment 'deployment1' will be resolved to 'deployment1'. This can be disabled by setting **traverseUpHierarchy** to false. _default: true_
+* **linkTTL** sets how long a link stays in the metrics after it was last seen, as a duration such as `30m` or `6h`, so links between workloads that are gone don't pile up. Set it to `0` to keep every link for as long as Caretta runs. _default: 1h_
 
 
 Example yaml for overriding these values:

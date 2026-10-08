@@ -76,6 +76,8 @@ spec:
               value: "{{ .Values.pollIntervalSeconds }}"
             - name: "TRAVERSE_UP_HIERARCHY"
               value: "{{ .Values.traverseUpHierarchy }}"
+            - name: "LINK_TTL"
+              value: {{ .Values.linkTTL | quote }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}

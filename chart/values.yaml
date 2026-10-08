@@ -3,6 +3,8 @@ prometheusPort: 7117
 prometheusEndpoint: "/metrics"
 pollIntervalSeconds: 5
 traverseUpHierarchy: true
+# Drop a link from the metrics once it hasn't been seen for this long (Go duration); "0" keeps links forever.
+linkTTL: 1h
 
 rbac:
   pspEnabled: true

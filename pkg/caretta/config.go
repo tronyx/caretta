@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 )
 
 const (
@@ -12,6 +13,7 @@ const (
 	defaultPollingIntervalSeconds = 5
 	defaultShouldResolveDns       = false
 	defaultTraverseUpHierarchy    = true
+	defaultLinkTTL                = time.Hour
 )
 
 type carettaConfig struct {
@@ -20,6 +22,7 @@ type carettaConfig struct {
 	prometheusEndpoint     string
 	pollingIntervalSeconds int
 	traverseUpHierarchy    bool
+	linkTTL                time.Duration
 }
 
 // environment variables based, encapsulated to enable future changes
@@ -61,11 +64,20 @@ func readConfig() carettaConfig {
 		}
 	}
 
+	linkTTL := defaultLinkTTL
+	if val := os.Getenv("LINK_TTL"); val != "" {
+		valDuration, err := time.ParseDuration(val)
+		if err == nil && valDuration >= 0 {
+			linkTTL = valDuration
+		}
+	}
+
 	return carettaConfig{
 		shouldResolveDns:       shouldResolveDns,
 		prometheusPort:         port,
 		prometheusEndpoint:     endpoint,
 		pollingIntervalSeconds: interval,
 		traverseUpHierarchy:    traverseUpHierarchy,
+		linkTTL:                linkTTL,
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net"
+	"time"
 
 	"github.com/groundcover-com/caretta/pkg/k8s"
 	"github.com/groundcover-com/caretta/pkg/tracing"
@@ -50,12 +51,16 @@ type LinksTracer struct {
 	ebpfObjects Probes
 	connections IEbpfMap
 	resolver    IPResolver
+
+	// Links not seen live in the eBPF map for longer than linkTTL are dropped; 0 keeps them forever.
+	linkTTL  time.Duration
+	lastSeen map[NetworkLink]time.Time
+	now      func() time.Time
 }
 
 // initializes a LinksTracer object
-func NewTracer(resolver *k8s.K8sIPResolver) LinksTracer {
-	tracer := LinksTracer{resolver: resolver}
-	return tracer
+func NewTracer(resolver *k8s.K8sIPResolver, linkTTL time.Duration) LinksTracer {
+	return LinksTracer{resolver: resolver, linkTTL: linkTTL}
 }
 
 func NewTracerWithObjs(resolver IPResolver, connections IEbpfMap, probes Probes) LinksTracer {
@@ -89,6 +94,13 @@ func (tracer *LinksTracer) TracesPollingIteration(pastLinks map[NetworkLink]uint
 	// filter unwanted connections, sum all connections as links, add past links, and return the new map
 	pollsMade.Inc()
 	loopbackCounter := 0
+	now := time.Now()
+	if tracer.now != nil {
+		now = tracer.now()
+	}
+	if tracer.linkTTL > 0 && tracer.lastSeen == nil {
+		tracer.lastSeen = make(map[NetworkLink]time.Time)
+	}
 
 	currentLinks := make(map[NetworkLink]uint64)
 	currentTcpConnections := []TcpConnection{}
@@ -127,6 +139,9 @@ func (tracer *LinksTracer) TracesPollingIteration(pastLinks map[NetworkLink]uint
 
 		currentLinks[link] += throughput.BytesSent
 		currentTcpConnections = append(currentTcpConnections, tcpConn)
+		if tracer.linkTTL > 0 {
+			tracer.lastSeen[link] = now
+		}
 	}
 
 	mapSize.Set(float64(itemsCounter))
@@ -142,8 +157,29 @@ func (tracer *LinksTracer) TracesPollingIteration(pastLinks map[NetworkLink]uint
 		tracer.deleteAndStoreConnection(&conn, pastLinks)
 	}
 
+	tracer.expireIdleLinks(now, pastLinks, currentLinks)
+
 	return pastLinks, currentLinks, currentTcpConnections
 
+}
+
+func (tracer *LinksTracer) expireIdleLinks(now time.Time, pastLinks, currentLinks map[NetworkLink]uint64) {
+	if tracer.linkTTL <= 0 {
+		return
+	}
+	// Closed links that were never live here (e.g. loopback) start their TTL now.
+	for link := range pastLinks {
+		if _, ok := tracer.lastSeen[link]; !ok {
+			tracer.lastSeen[link] = now
+		}
+	}
+	for link, seen := range tracer.lastSeen {
+		if now.Sub(seen) > tracer.linkTTL {
+			delete(tracer.lastSeen, link)
+			delete(pastLinks, link)
+			delete(currentLinks, link)
+		}
+	}
 }
 
 func (tracer *LinksTracer) deleteAndStoreConnection(conn *ConnectionIdentifier, pastLinks map[NetworkLink]uint64) {
