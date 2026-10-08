@@ -86,6 +86,21 @@ victoria-metrics-single:
         cpu: 5m
         memory: 50Mi
     fullnameOverride: caretta-vm
+    podSecurityContext:
+      enabled: true
+      runAsNonRoot: true
+      runAsUser: 65534
+      runAsGroup: 65534
+      fsGroup: 65534
+      seccompProfile:
+        type: RuntimeDefault
+    securityContext:
+      enabled: true
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop:
+          - ALL
     persistentVolume:
        enabled: false
        size: 16Gi # change enabled to true if you pv is required
