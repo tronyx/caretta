@@ -1,14 +1,17 @@
-name: pr
+name: build
 
 on:
- pull_request:
+  pull_request:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      id-token: write
+      contents: read
     steps:
       -
         name: Checkout
