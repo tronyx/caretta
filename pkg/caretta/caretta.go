@@ -46,7 +46,11 @@ func NewCaretta() *Caretta {
 }
 
 func (caretta *Caretta) Start() {
-	caretta.metricsServer = metrics.StartMetricsServer(caretta.config.prometheusEndpoint, caretta.config.prometheusPort)
+	metricsServer, err := metrics.StartMetricsServer(caretta.config.prometheusEndpoint, caretta.config.prometheusPort)
+	if err != nil {
+		log.Fatalf("Error starting Prometheus server: %v", err)
+	}
+	caretta.metricsServer = metricsServer
 
 	clientset, err := caretta.getClientSet()
 	if err != nil {
