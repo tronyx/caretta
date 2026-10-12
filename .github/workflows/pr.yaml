@@ -8,13 +8,42 @@ on:
   workflow_dispatch:
 
 jobs:
+  test:
+    name: Test and lint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v7
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+      -
+        name: gofmt, go vet and go test -race
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      -
+        # Also fails if a subchart's archive in chart/charts doesn't match Chart.yaml
+        name: Lint the chart
+        run: helm lint chart
+
   build:
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+      security-events: write
     env:
       PUBLISH: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/develop' }}
+      # Pinned to its digest; Dependabot doesn't update images run this way, so update it by hand
+      TRIVY: aquasec/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa
     steps:
       -
         name: Checkout
@@ -26,6 +55,36 @@ jobs:
       -
         name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
+      -
+        # Both architectures hold the same packages and binary dependencies, so one scan covers them
+        name: Build the amd64 image to scan
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          platforms: linux/amd64
+          cache-from: type=gha
+          tags: caretta:scan
+      -
+        name: Scan for vulnerabilities
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$RUNNER_TEMP:/out" "$TRIVY" image --image-src docker \
+            --scanners vuln --ignore-unfixed --format json --output /out/trivy.json caretta:scan
+          docker run --rm -v "$RUNNER_TEMP:/out" "$TRIVY" convert --format table /out/trivy.json
+          docker run --rm -v "$RUNNER_TEMP:/out" "$TRIVY" convert --format sarif --output /out/trivy.sarif /out/trivy.json
+      -
+        # Pull requests from forks can't write to the Security tab; their results are in the log above
+        name: Upload the scan to the Security tab
+        if: env.PUBLISH == 'true'
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: ${{ runner.temp }}/trivy.sarif
+          category: trivy-amd64
+      -
+        name: Fail on fixable critical vulnerabilities
+        run: |
+          docker run --rm -v "$RUNNER_TEMP:/out" "$TRIVY" convert --quiet --format table \
+            --severity CRITICAL --exit-code 1 /out/trivy.json
       -
         name: Login to GHCR
         if: env.PUBLISH == 'true'

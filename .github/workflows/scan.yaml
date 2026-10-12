@@ -1,0 +1,65 @@
+name: scan
+
+# Rescans the newest release's images weekly, so a vulnerability found after
+# it was published shows up without waiting for the next release. GitHub only
+# runs schedules from the default branch, main.
+on:
+  schedule:
+    - cron: "17 6 * * 4"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: Scan the newest release (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    env:
+      # The same pin as in pr.yaml; update by hand
+      TRIVY: aquasec/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Find the newest release
+        id: release
+        run: |
+          tag=$(git tag --list 'v*.*.*' --sort=-v:refname | head -n 1)
+          if [ -z "$tag" ]; then
+            echo "No release yet; nothing to scan."
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-list -n 1 "$tag" 2>/dev/null)" >> "$GITHUB_OUTPUT"
+      - name: Scan for vulnerabilities
+        if: steps.release.outputs.tag != ''
+        env:
+          # The same image as on GHCR, pulled from Docker Hub so it needs no login
+          IMAGE: docker.io/tronyx/caretta:${{ steps.release.outputs.tag }}
+        run: |
+          docker run --rm -v "$RUNNER_TEMP:/out" "$TRIVY" image --image-src remote --platform "linux/${{ matrix.arch }}" \
+            --scanners vuln --ignore-unfixed --format json --output /out/trivy.json "$IMAGE"
+          docker run --rm -v "$RUNNER_TEMP:/out" "$TRIVY" convert --format table /out/trivy.json
+          docker run --rm -v "$RUNNER_TEMP:/out" "$TRIVY" convert --format sarif --output /out/trivy.sarif /out/trivy.json
+      - name: Upload the scan to the Security tab
+        if: steps.release.outputs.tag != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: ${{ runner.temp }}/trivy.sarif
+          category: trivy-release-${{ matrix.arch }}
+          ref: refs/tags/${{ steps.release.outputs.tag }}
+          sha: ${{ steps.release.outputs.sha }}
+      # Fails the run, which emails whoever last changed the schedule above
+      - name: Fail on fixable critical vulnerabilities
+        if: steps.release.outputs.tag != ''
+        run: |
+          docker run --rm -v "$RUNNER_TEMP:/out" "$TRIVY" convert --quiet --format table \
+            --severity CRITICAL --exit-code 1 /out/trivy.json

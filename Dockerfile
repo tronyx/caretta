@@ -15,6 +15,14 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     make generate_ebpf build ARCH=${TARGETARCH}
 
+# CI runs the checks here, so they use the image's Go and generated eBPF code (docker build --target test .)
+FROM builder AS test
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    test -z "$(gofmt -l cmd pkg | tee /dev/stderr)" \
+ && go vet ./... \
+ && go test -race ./pkg/...
+
 # gcr.io/distroless/static-debian13 (root variant: attaching kprobes requires uid 0)
 FROM gcr.io/distroless/static-debian13@sha256:58133991db06659feaabe0f4e97a35cebf15ef4ea08f8a4c6d2ee5f75e4aa6a0
 COPY --from=builder /src/bin/caretta /caretta
