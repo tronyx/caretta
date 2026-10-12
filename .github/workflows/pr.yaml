@@ -33,8 +33,45 @@ jobs:
         name: Lint the chart
         run: helm lint chart
 
+  ebpf:
+    name: eBPF on the ${{ matrix.arch }} kernel
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v7
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+      -
+        name: Build the integration tests
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: integration-test
+          platforms: linux/${{ matrix.arch }}
+          outputs: type=local,dest=${{ runner.temp }}/integration
+          cache-from: type=gha
+      -
+        name: Show the kernel
+        run: uname -srm && ls -l /sys/kernel/btf/vmlinux
+      -
+        # Loads the real programs into the runner's kernel and checks what they record for real TCP connections
+        name: Run the integration tests as root
+        run: sudo "$RUNNER_TEMP/integration/caretta-integration.test" -test.v -test.count=1
+
   build:
-    needs: test
+    needs: [test, ebpf]
     runs-on: ubuntu-latest
     permissions:
       contents: read

@@ -14,6 +14,7 @@ Releases are tagged `vX.Y.Z`; each one publishes the images `ghcr.io/tronyx/care
 ### Project
 
 - Unit tests now cover the health checks, the metrics server, configuration parsing, the poll loop and shutdown order (the eBPF maps are never unloaded while a poll is reading them), loopback filtering, and the resolver's handling of deleted pods, nodes and services. Coverage goes from 50% to 77%. A bug in the resolver's test harness, which never applied modified workload resources, is fixed.
+- CI loads the real eBPF programs into the kernels of an amd64 and an arm64 runner and checks what they record for real TCP connections: both sides of a connection with the right roles, ports, process and byte counts, closed connections marked as such, and a poll turning them into links and deleting them from the kernel's map. It also catches Go and C struct layouts that don't match. Until now, nothing tested the eBPF code before release.
 
 ## [v0.1.0](https://github.com/tronyx/caretta/releases/tag/v0.1.0) · 2026-10-12
 
