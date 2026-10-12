@@ -8,7 +8,7 @@ This page tells you what Caretta needs, how to install it, and how to remove it.
 | --- | --- |
 | Kubernetes | Linux nodes on amd64 or arm64. Caretta is tested on Kubernetes 1.37. |
 | Helm | 3.8 or later, to install charts from an OCI registry. Helm 4 also works. |
-| Linux kernel | 5.8 or later, with BTF type information. For kernels 4.16 to 5.7, see [Older kernels](#older-kernels). |
+| Linux kernel | 5.8 or later, with BTF type information. For kernels 5.4 to 5.7, see [Older kernels](#older-kernels). |
 | tracefs | Mounted at `/sys/kernel/tracing` on each node. For another path, see [Other tracefs paths](#other-tracefs-paths). |
 | Pod Security | The namespace of Caretta must allow privileged pods. See [Pod Security](#pod-security). |
 
@@ -19,6 +19,8 @@ ls /sys/kernel/btf/vmlinux
 ```
 
 If the file exists, the node has BTF. The [libbpf documentation](https://github.com/libbpf/libbpf#bpf-co-re-compile-once--run-everywhere) lists the distributions that have it.
+
+GitHub tests Caretta on each long-term kernel from 5.4, and on the newest stable kernel. See [How it is tested](testing.md#the-checks-on-github).
 
 Docker Desktop also works, for example with a [kind](https://kind.sigs.k8s.io) cluster on a Mac. Recent releases of Docker Desktop run a Linux kernel with BTF.
 
@@ -89,7 +91,7 @@ On OpenShift, the chart adds a rule that lets the service account of Caretta use
 
 ## Older kernels
 
-The default configuration uses the `BPF` and `PERFMON` capabilities, which need kernel 5.8 or later. For kernels 4.16 to 5.7, replace them with `SYS_ADMIN` in your values file:
+The default configuration uses the `BPF` and `PERFMON` capabilities, which need kernel 5.8 or later. For kernels 5.4 to 5.7, replace them with `SYS_ADMIN` in your values file:
 
 ```yaml
 securityContext:
@@ -100,6 +102,8 @@ securityContext:
 ```
 
 `SYS_ADMIN` gives the agent more access than the default capabilities. Use it only on these older kernels.
+
+Caretta does not run on most kernels before 5.4, because they do not have BTF. On these kernels, the agent stops with the error `no BTF found for kernel version`. Some distributions add BTF to older kernels. The libbpf documentation in [Requirements](#requirements) lists them. Caretta is not tested on these kernels.
 
 ## Other tracefs paths
 

@@ -1,0 +1,7 @@
+# vimto runs the eBPF tests on other kernels, in a VM (see docs/testing.md).
+kernel = "ghcr.io/cilium/ci-kernels:stable"
+memory = "512M"
+# Loading eBPF programs needs root in the VM. The host needs no sudo.
+user = "root"
+# The VM has only lo, and Caretta skips 127.0.0.0/8, so the tests connect to a documentation address (RFC 5737).
+setup = ["ip addr add 192.0.2.1/32 dev lo"]

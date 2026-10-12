@@ -17,6 +17,8 @@ Releases are tagged `vX.Y.Z`; each one publishes the images `ghcr.io/tronyx/care
 - The README is rewritten in plain English, in the order a new user needs it: what Caretta does, requirements, installing, opening Grafana, configuration, metrics, upgrading and the example apps. It adds steps for clusters that enforce Pod Security Admission, using your own Prometheus, Caretta's own health metrics and the upgrade from groundcover's chart. Its example queries now work. The three in the old README didn't parse.
 - The documentation is split into pages in `docs/`: Installation, Upgrading, Configuration, Metrics, How it works, Troubleshooting and How it is tested. They add what the README didn't have room for: every chart value, every metric and label, the capabilities the agent needs and why, what each startup error and log message means, and what Caretta can't see. The README is shorter and links to each page.
 - The pages in `docs/` are copied to the [GitHub Wiki](https://github.com/tronyx/caretta/wiki) each time they change on `main`, so the wiki always matches the latest release. Edit the pages in `docs/`, since changes made in the wiki are overwritten.
+- CI also runs the eBPF tests on other kernels, each in a VM made by [vimto](https://github.com/lmb/vimto): every long-term kernel from 5.4 to 6.18, and the newest stable kernel. Before, they only ran on the kernels of GitHub's runners, which are all 6.x. All of them pass.
+- The docs no longer say that Caretta runs on kernels 4.16 to 5.7. The new tests showed that kernels before 5.4 usually have no BTF, and Caretta can't load without it. Kernels 5.4 to 5.7 work, with `SYS_ADMIN` instead of the default capabilities.
 
 ## [v0.2.0](https://github.com/tronyx/caretta/releases/tag/v0.2.0) · 2026-10-12
 
