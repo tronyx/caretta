@@ -2,7 +2,7 @@ name: scan
 
 # Rescans the newest release's images weekly, so a vulnerability found after
 # it was published shows up without waiting for the next release. GitHub only
-# runs schedules from the default branch, main.
+# runs schedules from the default branch, develop.
 on:
   schedule:
     - cron: "17 6 * * 4"

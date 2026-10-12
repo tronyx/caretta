@@ -1,6 +1,5 @@
 version: 2
-# Dependabot reads this file from the default branch (main), so it starts
-# working once it's merged there; its pull requests target develop.
+# All pull requests target develop, the default branch.
 updates:
   # The actions in .github/workflows, so CI doesn't break when GitHub retires
   # an old major version.
