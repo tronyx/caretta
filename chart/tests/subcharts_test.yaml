@@ -1,0 +1,92 @@
+suite: bundled Grafana and VictoriaMetrics
+templates:
+  - charts/grafana/templates/deployment.yaml
+  - charts/grafana/templates/configmap.yaml
+  - charts/grafana/templates/secret.yaml
+  - charts/grafana/templates/tests/test.yaml
+  - charts/victoria-metrics-single/templates/server.yaml
+  - charts/victoria-metrics-single/templates/scrape-configmap.yaml
+  - templates/grafana/dashboards.yaml
+release:
+  name: caretta
+tests:
+  # Versions are left to Dependabot; these only require an explicit tag that isn't "latest".
+  - it: pins every image to an explicit version
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ^docker\.io/grafana/grafana:\d+\.\d+\.\d+-distroless$
+        template: charts/grafana/templates/deployment.yaml
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ^docker\.io/victoriametrics/victoria-metrics:v\d+\.\d+\.\d+$
+        template: charts/victoria-metrics-single/templates/server.yaml
+      - matchRegex:
+          path: spec.containers[0].image
+          pattern: ^docker\.io/bats/bats:\d+\.\d+\.\d+$
+        template: charts/grafana/templates/tests/test.yaml
+
+  - it: keeps anonymous access to Grafana off
+    template: charts/grafana/templates/configmap.yaml
+    asserts:
+      - matchRegex:
+          path: data["grafana.ini"]
+          pattern: \[auth\.anonymous\]\nenabled = false
+      - matchRegex:
+          path: data["grafana.ini"]
+          pattern: default_home_dashboard_path = /var/lib/grafana/dashboards/default/dashboard.json
+
+  # Releases before the fork shipped the password "caretta".
+  - it: generates Grafana's admin password instead of using a fixed one
+    template: charts/grafana/templates/secret.yaml
+    asserts:
+      - notEqual:
+          path: data["admin-password"]
+          value: Y2FyZXR0YQ==
+      - matchRegex:
+          path: data["admin-password"]
+          pattern: ^.{20,}$
+      - equal:
+          path: data["admin-user"]
+          value: YWRtaW4=
+
+  - it: points Grafana at the bundled VictoriaMetrics
+    template: charts/grafana/templates/configmap.yaml
+    asserts:
+      - matchRegex:
+          path: data["datasources.yaml"]
+          pattern: 'url: http://caretta-vm:8428'
+
+  - it: ships the dashboard
+    template: templates/grafana/dashboards.yaml
+    asserts:
+      - equal:
+          path: metadata.name
+          value: caretta-grafana-dashboards
+      - matchRegex:
+          path: data["dashboard.json"]
+          pattern: caretta_links_observed
+
+  - it: runs VictoriaMetrics as non-root with a read-only filesystem
+    template: charts/victoria-metrics-single/templates/server.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
+      - equal:
+          path: spec.template.spec.containers[0].securityContext
+          value:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+
+  - it: scrapes only caretta's pods, in its own namespace
+    template: charts/victoria-metrics-single/templates/scrape-configmap.yaml
+    asserts:
+      - matchRegex:
+          path: data["scrape.yml"]
+          pattern: 'own_namespace: true'
+      - matchRegex:
+          path: data["scrape.yml"]
+          pattern: '(?s)action: keep.*regex: caretta'

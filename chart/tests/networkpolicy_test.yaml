@@ -1,0 +1,186 @@
+suite: NetworkPolicies
+templates:
+  - templates/networkpolicy.yaml
+release:
+  name: caretta
+tests:
+  - it: isn't created by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: lets only the bundled VictoriaMetrics scrape caretta
+    set:
+      networkPolicy.enabled: true
+    documentSelector:
+      path: metadata.name
+      value: caretta
+    asserts:
+      - equal:
+          path: spec.podSelector.matchLabels
+          value:
+            app: caretta
+            app.kubernetes.io/name: caretta
+            app.kubernetes.io/instance: caretta
+      - equal:
+          path: spec.ingress
+          value:
+            - ports:
+                - protocol: TCP
+                  port: 7117
+              from:
+                - podSelector:
+                    matchLabels:
+                      app.kubernetes.io/name: victoria-metrics-single
+                      app.kubernetes.io/instance: caretta
+
+  - it: limits caretta's egress to DNS and the API server
+    set:
+      networkPolicy.enabled: true
+    documentSelector:
+      path: metadata.name
+      value: caretta
+    asserts:
+      - equal:
+          path: spec.policyTypes
+          value: [Ingress, Egress]
+      - equal:
+          path: spec.egress
+          value:
+            - ports:
+                - protocol: UDP
+                  port: 53
+                - protocol: TCP
+                  port: 53
+            - ports:
+                - protocol: TCP
+                  port: 443
+                - protocol: TCP
+                  port: 6443
+              to:
+                - ipBlock:
+                    cidr: 0.0.0.0/0
+                - ipBlock:
+                    cidr: ::/0
+
+  - it: narrows the API server rule to the given addresses and ports
+    set:
+      networkPolicy.enabled: true
+      networkPolicy.apiServer.cidrs: [172.18.0.2/32]
+      networkPolicy.apiServer.ports: [6443]
+    documentSelector:
+      path: metadata.name
+      value: caretta
+    asserts:
+      - equal:
+          path: spec.egress[1]
+          value:
+            ports:
+              - protocol: TCP
+                port: 6443
+            to:
+              - ipBlock:
+                  cidr: 172.18.0.2/32
+
+  - it: lets in extra scrapers
+    set:
+      networkPolicy.enabled: true
+      networkPolicy.metricsFrom:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+    documentSelector:
+      path: metadata.name
+      value: caretta
+    asserts:
+      - contains:
+          path: spec.ingress[0].from
+          content:
+            namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: monitoring
+
+  # An empty "from" would let in traffic from anywhere.
+  - it: denies all ingress to caretta when nothing may scrape it
+    set:
+      networkPolicy.enabled: true
+      victoria-metrics-single.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isEmpty:
+          path: spec.ingress
+
+  - it: lets only the bundled Grafana query VictoriaMetrics
+    set:
+      networkPolicy.enabled: true
+    documentSelector:
+      path: metadata.name
+      value: caretta-vm
+    asserts:
+      - equal:
+          path: spec.podSelector.matchLabels
+          value:
+            app.kubernetes.io/name: victoria-metrics-single
+            app.kubernetes.io/instance: caretta
+      - equal:
+          path: spec.ingress
+          value:
+            - ports:
+                - protocol: TCP
+                  port: 8428
+              from:
+                - podSelector:
+                    matchLabels:
+                      app.kubernetes.io/name: grafana
+                      app.kubernetes.io/instance: caretta
+
+  - it: lets VictoriaMetrics reach caretta's metrics port
+    set:
+      networkPolicy.enabled: true
+      prometheusPort: 9100
+    documentSelector:
+      path: metadata.name
+      value: caretta-vm
+    asserts:
+      - contains:
+          path: spec.egress
+          content:
+            ports:
+              - protocol: TCP
+                port: 9100
+            to:
+              - podSelector:
+                  matchLabels:
+                    app: caretta
+                    app.kubernetes.io/name: caretta
+                    app.kubernetes.io/instance: caretta
+
+  - it: denies all ingress to VictoriaMetrics when nothing may query it
+    set:
+      networkPolicy.enabled: true
+      grafana.enabled: false
+    documentSelector:
+      path: metadata.name
+      value: caretta-vm
+    asserts:
+      - isEmpty:
+          path: spec.ingress
+
+  - it: lets in extra dashboards
+    set:
+      networkPolicy.enabled: true
+      networkPolicy.queryFrom:
+        - podSelector:
+            matchLabels:
+              app: my-grafana
+    documentSelector:
+      path: metadata.name
+      value: caretta-vm
+    asserts:
+      - contains:
+          path: spec.ingress[0].from
+          content:
+            podSelector:
+              matchLabels:
+                app: my-grafana
