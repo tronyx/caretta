@@ -52,6 +52,8 @@ Useful values:
 * The built-in Victoria Metrics and Grafana instances can be disabled by changing the values **victoria-metrics-single.enabled** or **grafana.enabled** to false, accordingly. _default: true_
 * Caretta resolves Kubernetes entities to their owners by default. For example, a pod 'pod1' and another pod 'pod2' both belonging to a deployment 'deployment1' will be resolved to 'deployment1'. This can be disabled by setting **traverseUpHierarchy** to false. _default: true_
 * **linkTTL** sets how long a link stays in the metrics after it was last seen, as a duration such as `30m` or `6h`, so links between workloads that are gone don't pile up. Set it to `0` to keep every link for as long as Caretta runs. _default: 1h_
+* **maxConnections** is how many connections Caretta can track on each node at once: those open, plus those closed since the last poll. The kernel reserves memory for all of them when Caretta starts, about 192 MiB at the default, scaling linearly, and it counts against Caretta's memory limit. When the table is full, new connections aren't tracked; `caretta_ebpf_connections_map_size` shows how full it is. Lowering it saves memory on every node. _default: 1000000_
+* **resources** and **goMemLimit** set Caretta's CPU and memory. The memory limit has to cover the `maxConnections` memory above plus Caretta itself, and **goMemLimit** should stay below the limit minus that kernel memory, so Go frees memory before the pod runs out. If you change `maxConnections`, adjust them to match. _defaults: limit 512Mi, request 256Mi, goMemLimit 256MiB_
 
 
 Example yaml for overriding these values:

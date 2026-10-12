@@ -78,6 +78,12 @@ spec:
               value: "{{ .Values.traverseUpHierarchy }}"
             - name: "LINK_TTL"
               value: {{ .Values.linkTTL | quote }}
+            - name: "MAX_CONNECTIONS"
+              value: {{ .Values.maxConnections | int | quote }}
+            {{- with .Values.goMemLimit }}
+            - name: "GOMEMLIMIT"
+              value: {{ . | quote }}
+            {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}

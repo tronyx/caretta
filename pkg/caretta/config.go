@@ -14,6 +14,7 @@ const (
 	defaultShouldResolveDns       = false
 	defaultTraverseUpHierarchy    = true
 	defaultLinkTTL                = time.Hour
+	defaultMaxConnections         = 1_000_000
 )
 
 type carettaConfig struct {
@@ -23,6 +24,7 @@ type carettaConfig struct {
 	pollingIntervalSeconds int
 	traverseUpHierarchy    bool
 	linkTTL                time.Duration
+	maxConnections         uint32
 }
 
 // environment variables based, encapsulated to enable future changes
@@ -72,6 +74,14 @@ func readConfig() carettaConfig {
 		}
 	}
 
+	maxConnections := uint32(defaultMaxConnections)
+	if val := os.Getenv("MAX_CONNECTIONS"); val != "" {
+		valUint, err := strconv.ParseUint(val, 10, 32)
+		if err == nil && valUint > 0 {
+			maxConnections = uint32(valUint)
+		}
+	}
+
 	return carettaConfig{
 		shouldResolveDns:       shouldResolveDns,
 		prometheusPort:         port,
@@ -79,5 +89,6 @@ func readConfig() carettaConfig {
 		pollingIntervalSeconds: interval,
 		traverseUpHierarchy:    traverseUpHierarchy,
 		linkTTL:                linkTTL,
+		maxConnections:         maxConnections,
 	}
 }

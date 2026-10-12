@@ -19,6 +19,8 @@ Releases are tagged `vX.Y.Z`; each one publishes the images `ghcr.io/tronyx/care
 - Caretta is ready in seconds: it waited a fixed 10 seconds before attaching its probes, and now attaches them as soon as it has loaded the cluster's state.
 - Caretta follows the cluster through client-go informers instead of nine hand-written watches, and caches only the fields it uses from each object, so each node holds far less of the cluster in memory. The flood of `couldn't retrieve owner` warnings at startup is gone, since every cache is loaded before the first pod is resolved. A deleted pod's IP is forgotten 2 minutes after the pod is gone, and a deleted node's or Service's at once, so a reused IP never keeps an old name.
 - A link leaves the metrics once it hasn't been seen for an hour, set by the new `linkTTL` value (`0` keeps links for as long as caretta runs, as before). A link that comes back after that starts again from zero, which `rate()` and `increase()`, and so the bundled dashboard, handle as a counter reset.
+- How many connections caretta can track per node is the new `maxConnections` value, 1,000,000 by default as before. The kernel reserves memory for all of them when caretta starts, about 192 MiB at the default, which is most of caretta's memory, so lowering it saves memory on every node.
+- Caretta's resources match what it uses: a 256Mi memory request (it was 50Mi, below the eBPF maps alone, which made caretta an early eviction target), a 512Mi limit, and a 500m CPU limit instead of 150m, so a poll of a busy node isn't throttled. Go's memory limit is set to 256MiB by the new `goMemLimit` value, so Go frees memory before the pod reaches its limit.
 
 ### Fixed
 
@@ -27,6 +29,7 @@ Releases are tagged `vX.Y.Z`; each one publishes the images `ghcr.io/tronyx/care
 - When re-opening a dropped watch failed, the resolver crashed on its next event, which could take caretta down on every node at once during an API server blip.
 - A new Service that reused a deleted Service's cluster IP was never mapped, and stayed under the old Service's name until caretta restarted.
 - `POLL_INTERVAL=0` made caretta crash at startup; a value of 0 or less is now ignored.
+- Grafana 13 uses about 290 MiB on its own, which left it at the edge of its 300Mi limit, so a dashboard with heavy queries or a `grafana cli` command got it killed. Its limit is now 512Mi with a 320Mi request, and VictoriaMetrics' memory request is 96Mi, closer to the 70 MiB it uses.
 - Caretta's memory, and the number of series in VictoriaMetrics, grew for as long as it ran: `caretta_links_observed` and `caretta_tcp_states` kept every label set they had ever seen, so each pod that came and went and each closed connection stayed in the metrics, until a busy cluster's caretta pods ran out of memory. The metrics now show only the latest poll: a closed connection leaves `caretta_tcp_states` at the next poll, and an idle link leaves `caretta_links_observed` after `linkTTL`. The metric names and labels are unchanged.
 
 ### Removed

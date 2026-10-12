@@ -55,7 +55,7 @@ func (caretta *Caretta) Start() error {
 	}
 
 	caretta.tracer = NewTracer(resolver, caretta.config.linkTTL)
-	if err := caretta.tracer.Start(); err != nil {
+	if err := caretta.tracer.Start(caretta.config.maxConnections); err != nil {
 		return fmt.Errorf("loading probes: %w", err)
 	}
 	caretta.health.MarkReady()

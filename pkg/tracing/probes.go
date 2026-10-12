@@ -16,13 +16,21 @@ type Probes struct {
 	BpfObjs    bpfObjects
 }
 
-func LoadProbes() (Probes, *ebpf.Map, error) {
+// maxConnections sizes both connection maps; the kernel reserves their memory up front.
+func LoadProbes(maxConnections uint32) (Probes, *ebpf.Map, error) {
 	if err := rlimit.RemoveMemlock(); err != nil {
 		return Probes{}, nil, fmt.Errorf("error removing memory lock - %v", err)
 	}
 
+	spec, err := loadBpf()
+	if err != nil {
+		return Probes{}, nil, fmt.Errorf("error loading BPF spec: %v", err)
+	}
+	spec.Maps[bpfMapConnections].MaxEntries = maxConnections
+	spec.Maps[bpfMapSockInfos].MaxEntries = maxConnections
+
 	objs := bpfObjects{}
-	err := loadBpfObjects(&objs, &ebpf.CollectionOptions{})
+	err = spec.LoadAndAssign(&objs, &ebpf.CollectionOptions{})
 	if err != nil {
 		var ve *ebpf.VerifierError
 		if errors.As(err, &ve) {

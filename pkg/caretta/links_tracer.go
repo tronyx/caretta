@@ -71,8 +71,8 @@ func NewTracerWithObjs(resolver IPResolver, connections IEbpfMap, probes Probes)
 	}
 }
 
-func (tracer *LinksTracer) Start() error {
-	objs, connMap, err := tracing.LoadProbes()
+func (tracer *LinksTracer) Start(maxConnections uint32) error {
+	objs, connMap, err := tracing.LoadProbes(maxConnections)
 	if err != nil {
 		return err
 	}
