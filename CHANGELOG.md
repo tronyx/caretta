@@ -6,6 +6,12 @@ Releases are tagged `vX.Y.Z`; each one publishes the images `ghcr.io/tronyx/care
 
 ## Unreleased
 
+Nothing yet.
+
+## [v0.1.0](https://github.com/tronyx/caretta/releases/tag/v0.1.0) · 2026-10-12
+
+The fork's first release.
+
 ### Changed
 
 - Every container image is pinned to an explicit, current version, and none uses `latest`. Grafana goes from 9.3.1 to 13.2.3 (distroless) and VictoriaMetrics from v1.85.3 to v1.153.0, both now pulled from their upstream registries instead of groundcover's Quay mirrors, which stopped being updated in 2023. Grafana's helper images (k8s-sidecar, busybox, curl, bats and the image renderer, which defaulted to `latest`) are pinned too. The Grafana subchart moves to the grafana-community repository, where it has lived since January 2026.

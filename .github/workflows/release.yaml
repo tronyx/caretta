@@ -75,3 +75,19 @@ jobs:
           helm package --version "${version}" --app-version "${GITHUB_TAG}" chart
           echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
           helm push "caretta-${version}.tgz" oci://ghcr.io/tronyx/charts
+      -
+        # The notes are the release's section of CHANGELOG.md, up to the next version's heading
+        name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TAG: ${{ github.ref_name }}
+        run: |
+          awk -v tag="$GITHUB_TAG" '
+            /^## / { if (found) exit; if (index($0, "[" tag "]")) { found = 1; next } }
+            found
+          ' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          if [ ! -s "$RUNNER_TEMP/notes.md" ]; then
+            echo "::error::CHANGELOG.md has no section for $GITHUB_TAG"
+            exit 1
+          fi
+          gh release create "$GITHUB_TAG" --title "$GITHUB_TAG" --notes-file "$RUNNER_TEMP/notes.md" --verify-tag
