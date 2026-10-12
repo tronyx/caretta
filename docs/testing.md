@@ -119,7 +119,7 @@ GitHub runs these checks on each pull request and on each push to `develop`:
 | eBPF on the amd64 kernel and eBPF on the arm64 kernel | The eBPF tests, as root, on the kernels of an amd64 and an arm64 runner. |
 | eBPF on Linux, with a kernel version | The eBPF tests in a VM, on each long-term kernel from 5.4, and on the newest stable kernel. See [eBPF tests on other kernels](#ebpf-tests-on-other-kernels). |
 | End-to-end on kind | The end-to-end tests on a new kind cluster, with the image from the same run. |
-| build | Builds the image, and scans it for known vulnerabilities. On `develop`, it also publishes the image with the tag `develop-` and the first 7 characters of the commit. |
+| build | Builds the image, and scans it for known vulnerabilities. On `develop`, it also publishes and signs the image with the tag `develop-` and the first 7 characters of the commit. |
 
 The build starts only after the tests pass. If the image has a critical vulnerability that has a fix, the build fails and does not publish the image.
 
@@ -127,7 +127,7 @@ The build starts only after the tests pass. If the image has a critical vulnerab
 
 | Workflow | When | What it does |
 | --- | --- | --- |
-| release | For each version tag | Scans and publishes the image and the chart, and makes the GitHub release from the changelog. |
+| release | For each version tag | Scans, publishes and signs the image and the chart, and makes the GitHub release from the changelog. |
 | scan | Each week | Scans the images of the newest release again, for vulnerabilities that were found after the release. |
 | Sync the wiki | For each change to `docs/` on `main` | Copies the `docs/` folder to the wiki of the repository. |
 
