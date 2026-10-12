@@ -8,6 +8,25 @@ Releases are tagged `vX.Y.Z`; each one publishes the images `ghcr.io/tronyx/care
 
 Nothing yet.
 
+## [v0.2.0](https://github.com/tronyx/caretta/releases/tag/v0.2.0) · 2026-10-12
+
+Bug fixes found by a new test suite, which now checks every change on real amd64 and arm64 kernels and on a kind cluster before anything is published.
+
+**Upgrading:** if you set `serviceAccount.create: false`, also set `serviceAccount.name` to the account caretta should use. Until now the chart created its own account regardless; without a name, caretta now runs as the namespace's `default` account, which can't read the cluster.
+
+### Fixed
+
+- When two links ended up with the same labels, `caretta_links_observed` showed only one of them, picked at random on each poll, so its value could jump between scrapes and look like counter resets. Their byte counts are now added together.
+- A `PROMETHEUS_PORT` of `0`, a negative number or one above 65535 is ignored, like other invalid settings, instead of starting the metrics server on a random port that every probe then fails to reach.
+- The chart's `serviceAccount` values now take effect. `serviceAccount.annotations` are added to the service account, for example for cloud workload identity such as EKS IAM roles. `serviceAccount.create: false` uses an existing account, named by `serviceAccount.name`, instead of creating one anyway. By default the account is still called `caretta`, so existing installs don't change.
+
+### Project
+
+- Unit tests now cover the health checks, the metrics server, configuration parsing, the poll loop and shutdown order (the eBPF maps are never unloaded while a poll is reading them), loopback filtering, and the resolver's handling of deleted pods, nodes and services. Coverage goes from 50% to 77%. A bug in the resolver's test harness, which never applied modified workload resources, is fixed.
+- CI loads the real eBPF programs into the kernels of an amd64 and an arm64 runner and checks what they record for real TCP connections: both sides of a connection with the right roles, ports, process and byte counts, closed connections marked as such, and a poll turning them into links and deleting them from the kernel's map. It also catches Go and C struct layouts that don't match. Until now, nothing tested the eBPF code before release.
+- The Helm chart has tests (`chart/tests`, run with helm-unittest in CI). They check caretta's security context and capabilities, the read-only tracefs mount, the configuration it's given, the probes, RBAC, the service account, every NetworkPolicy case (including that one never lets in traffic from anywhere), pinned images with no `latest`, and Grafana's generated password and disabled anonymous access.
+- An end-to-end test runs on a kind cluster in CI, with the image built in the same run. It installs the chart with the NetworkPolicies on, starts the demo app, and checks that caretta maps each of its connections, that VictoriaMetrics scrapes it, that Grafana requires a login and can query VictoriaMetrics, and that caretta shuts down without errors. Images are only published once it passes. The same test runs locally with `scripts/e2e.sh`, and the README explains how to run every kind of test.
+
 ## [v0.1.0](https://github.com/tronyx/caretta/releases/tag/v0.1.0) · 2026-10-12
 
 The fork's first release.

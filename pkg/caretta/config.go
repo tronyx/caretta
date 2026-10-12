@@ -32,7 +32,7 @@ func readConfig() carettaConfig {
 	port := defaultPrometheusPort
 	if val := os.Getenv("PROMETHEUS_PORT"); val != "" {
 		valInt, err := strconv.Atoi(val)
-		if err == nil {
+		if err == nil && valInt > 0 && valInt <= 65535 {
 			port = fmt.Sprintf(":%d", valInt)
 		}
 	}

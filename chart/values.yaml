@@ -35,12 +35,11 @@ resources:
     memory: 256Mi
 
 serviceAccount:
-  # Specifies whether a service account should be created
+  # Set to false to use an existing service account, named below
   create: true
-  # Annotations to add to the service account
+  # Annotations to add to the service account, e.g. for cloud workload identity
   annotations: {}
-  # The name of the service account to use.
-  # If not set and create is true, a name is generated using the fullname template
+  # Defaults to the chart's name when create is true, and to "default" when it's false
   name: ""
 
 podAnnotations: {}

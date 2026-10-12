@@ -2,6 +2,8 @@ package caretta
 
 import (
 	"errors"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -173,6 +175,48 @@ func TestCollectorServesOnlyTheLatestPoll(t *testing.T) {
 
 	c.update(map[NetworkLink]uint64{}, nil)
 	assert.Equal(0, testutil.CollectAndCount(c), "series from earlier polls are gone")
+}
+
+func TestCollectorSumsLinksThatShareLabels(t *testing.T) {
+	client := k8s.Workload{Name: "client", Namespace: "ns", Kind: "Deployment"}
+	serverA := k8s.Workload{Name: "server", Namespace: "ns", Kind: "Deployment", Owner: "a"}
+	serverB := k8s.Workload{Name: "server", Namespace: "ns", Kind: "Deployment", Owner: "b"}
+	c := &linksCollector{}
+
+	// The server's owner isn't a label, so these two links are one series.
+	c.update(map[NetworkLink]uint64{
+		{Client: client, Server: serverA, ServerPort: 80, Role: ClientConnectionRole}: 10,
+		{Client: client, Server: serverB, ServerPort: 80, Role: ClientConnectionRole}: 20,
+	}, nil)
+
+	expected := `
+# HELP caretta_links_observed total bytes_sent value of links observed by caretta since its launch
+# TYPE caretta_links_observed gauge
+caretta_links_observed{client_id="` + strconv.Itoa(int(fnvHash("clientns"))) + `",client_kind="Deployment",client_name="client",client_namespace="ns",client_owner="",link_id="` + strconv.Itoa(int(fnvHash("clientnsserverns")+ClientConnectionRole)) + `",role="1",server_id="` + strconv.Itoa(int(fnvHash("serverns"))) + `",server_kind="Deployment",server_name="server",server_namespace="ns",server_port="80"} 30
+`
+	assert.NoError(t, testutil.CollectAndCompare(c, strings.NewReader(expected), "caretta_links_observed"))
+}
+
+func TestLoopbackConnectionsAreSkipped(t *testing.T) {
+	loopback := uint32(0x0100007f) // 127.0.0.1, as the kernel stores it
+	connections := &stubMap{entries: map[ConnectionIdentifier]ConnectionThroughputStats{
+		{Id: 1, Tuple: ConnectionTuple{SrcIp: loopback, DstIp: loopback, DstPort: 80}, Role: ClientConnectionRole}: {BytesSent: 10, IsActive: 1},
+		{Id: 2, Tuple: ConnectionTuple{SrcIp: 1, DstIp: 2, DstPort: 80}, Role: ClientConnectionRole}:               {BytesSent: 20, IsActive: 1},
+	}}
+	tracer := LinksTracer{connections: connections, resolver: stubResolver{}}
+
+	_, links, tcpConnections, err := tracer.TracesPollingIteration(map[NetworkLink]uint64{})
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(20), sumValues(links), "only the non-loopback connection is counted")
+	assert.Len(t, tcpConnections, 1)
+	assert.Equal(t, 1.0, testutil.ToFloat64(filteredLoopbackConnections))
+}
+
+func TestIsAddressLoopback(t *testing.T) {
+	assert.True(t, isAddressLoopback(0x0100007f), "127.0.0.1")
+	assert.True(t, isAddressLoopback(0x0500007f), "127.0.0.5")
+	assert.False(t, isAddressLoopback(0x0100000a), "10.0.0.1")
+	assert.False(t, isAddressLoopback(0x7f000001), "1.0.0.127 is not loopback: the bytes are in network order")
 }
 
 func sumValues(links map[NetworkLink]uint64) uint64 {

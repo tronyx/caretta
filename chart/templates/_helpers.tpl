@@ -55,7 +55,7 @@ Create the name of the service account to use
 */}}
 {{- define "caretta.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
-{{- default (include "caretta.fullname" .) .Values.serviceAccount.name }}
+{{- default (include "caretta.name" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}

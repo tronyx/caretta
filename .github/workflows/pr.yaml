@@ -32,9 +32,91 @@ jobs:
         # Also fails if a subchart's archive in chart/charts doesn't match Chart.yaml
         name: Lint the chart
         run: helm lint chart
+      -
+        # chart/tests; pinned to its digest, update by hand (Dependabot doesn't update images run this way).
+        # Runs as the runner's user so it can write to the checkout.
+        name: Test the chart
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD/chart:/apps" \
+            helmunittest/helm-unittest:4.3.0-1.2.1@sha256:28ea86c3e0b07f501f0c2e9c08b9f41e240f4a4b571cb5106b36cf0f0607e989 .
+
+  ebpf:
+    name: eBPF on the ${{ matrix.arch }} kernel
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v7
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+      -
+        name: Build the integration tests
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: integration-test
+          platforms: linux/${{ matrix.arch }}
+          outputs: type=local,dest=${{ runner.temp }}/integration
+          cache-from: type=gha
+      -
+        name: Show the kernel
+        run: uname -srm && ls -l /sys/kernel/btf/vmlinux
+      -
+        # Loads the real programs into the runner's kernel and checks what they record for real TCP connections
+        name: Run the integration tests as root
+        run: sudo "$RUNNER_TEMP/integration/caretta-integration.test" -test.v -test.count=1
+
+  e2e:
+    name: End-to-end on kind
+    needs: [test, ebpf]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v7
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+      -
+        name: Build the image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          platforms: linux/amd64
+          cache-from: type=gha
+          tags: caretta:e2e
+      -
+        name: Create a kind cluster
+        uses: helm/kind-action@v1.15.1
+        with:
+          cluster_name: caretta-e2e
+      -
+        name: Load the image into the cluster
+        run: kind load docker-image caretta:e2e --name caretta-e2e
+      -
+        # Installs the chart, runs the demo app, and checks the service map, Grafana and a clean shutdown
+        name: Run the end-to-end tests
+        env:
+          IMAGE_REPOSITORY: caretta
+          IMAGE_TAG: e2e
+        run: scripts/e2e.sh
 
   build:
-    needs: test
+    needs: [test, ebpf, e2e]
     runs-on: ubuntu-latest
     permissions:
       contents: read

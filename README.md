@@ -36,11 +36,11 @@ Caretta demonstrates the power of using eBPF for observability solutions, which 
 As simple as installing a helm chart. It is recommended to install Caretta in a new, unique namespace.
 The chart is published as an OCI artifact on GHCR; see the [changelog](CHANGELOG.md) for newer versions than the one below.
 ```bash
-helm install caretta oci://ghcr.io/tronyx/charts/caretta --version 0.1.0 --namespace caretta --create-namespace
+helm install caretta oci://ghcr.io/tronyx/charts/caretta --version 0.2.0 --namespace caretta --create-namespace
 ```
 To see a chart's details or values before installing:
 ```bash
-helm show values oci://ghcr.io/tronyx/charts/caretta --version 0.1.0
+helm show values oci://ghcr.io/tronyx/charts/caretta --version 0.2.0
 ```
 
 ### Configuration
@@ -157,3 +157,15 @@ Feel free to add your contribution to the project.
 
 * Open an issue for missing features, or bugs
 * Create a pull request for adding code to the project
+
+### Running the tests
+CI runs all of these on every pull request.
+
+* **Unit tests**, in the same Go and generated eBPF code as the image: `docker build --target test .`
+* **eBPF integration tests**, which load the real programs into your kernel and need root on Linux:
+  ```bash
+  docker build --target integration-test --output /tmp/integration .
+  sudo /tmp/integration/caretta-integration.test -test.v
+  ```
+* **Chart tests**: `docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD/chart:/apps" helmunittest/helm-unittest:4.3.0-1.2.1 .`
+* **End-to-end tests** on a kind cluster: build the image, load it with `kind load docker-image caretta:e2e`, then run `IMAGE_REPOSITORY=caretta IMAGE_TAG=e2e scripts/e2e.sh`. It installs the chart and the demo app on your current kubectl context.

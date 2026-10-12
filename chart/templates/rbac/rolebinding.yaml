@@ -8,5 +8,5 @@ roleRef:
   name: {{ include "caretta.fullname" . }}
 subjects:
   - kind: ServiceAccount
-    name: {{ include "caretta.name" . }}
+    name: {{ include "caretta.serviceAccountName" . }}
     namespace: {{ .Release.Namespace }}

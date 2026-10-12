@@ -1,0 +1,206 @@
+suite: caretta DaemonSet
+templates:
+  - templates/daemonset.yaml
+chart:
+  appVersion: v9.8.7
+tests:
+  - it: defaults the image tag to the chart's appVersion
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: ghcr.io/tronyx/caretta:v9.8.7
+      - equal:
+          path: spec.template.spec.containers[0].imagePullPolicy
+          value: IfNotPresent
+
+  - it: uses an explicit image tag when set
+    set:
+      image.repository: docker.io/tronyx/caretta
+      image.tag: develop-abc1234
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: docker.io/tronyx/caretta:develop-abc1234
+
+  - it: runs without privileged mode, with only the capabilities eBPF needs
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext
+          value:
+            privileged: false
+            runAsUser: 0
+            runAsNonRoot: false
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+              add: [BPF, PERFMON, SYS_RESOURCE]
+      - equal:
+          path: spec.template.spec.securityContext.seccompProfile.type
+          value: RuntimeDefault
+      - notExists:
+          path: spec.template.spec.hostNetwork
+      - notExists:
+          path: spec.template.spec.hostPID
+
+  - it: mounts only tracefs from the host, read-only
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.volumes
+          count: 1
+      - equal:
+          path: spec.template.spec.volumes[0].hostPath
+          value:
+            path: /sys/kernel/tracing
+            type: Directory
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0]
+          value:
+            mountPath: /sys/kernel/tracing
+            name: tracefs
+            readOnly: true
+
+  - it: mounts tracefs from another host path when set
+    set:
+      tracefsPath: /sys/kernel/debug/tracing
+    asserts:
+      - equal:
+          path: spec.template.spec.volumes[0].hostPath.path
+          value: /sys/kernel/debug/tracing
+
+  - it: passes the configuration to caretta
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env
+          value:
+            - name: RESOLVE_DNS
+              value: "true"
+            - name: PROMETHEUS_PORT
+              value: "7117"
+            - name: PROMETHEUS_ENDPOINT
+              value: /metrics
+            - name: POLL_INTERVAL
+              value: "5"
+            - name: TRAVERSE_UP_HIERARCHY
+              value: "true"
+            - name: LINK_TTL
+              value: 1h
+            - name: MAX_CONNECTIONS
+              value: "1000000"
+            - name: LOG_FORMAT
+              value: json
+            - name: GOMEMLIMIT
+              value: 256MiB
+
+  - it: writes large maxConnections as an integer, not in scientific notation
+    set:
+      maxConnections: 4000000
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MAX_CONNECTIONS
+            value: "4000000"
+
+  - it: passes linkTTL 0 through, which keeps links forever
+    set:
+      linkTTL: "0"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: LINK_TTL
+            value: "0"
+
+  - it: leaves GOMEMLIMIT unset when goMemLimit is empty
+    set:
+      goMemLimit: ""
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          any: true
+          content:
+            name: GOMEMLIMIT
+
+  - it: probes the metrics port, which follows prometheusPort
+    set:
+      prometheusPort: 9100
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports[0]
+          value:
+            name: prom-metrics
+            containerPort: 9100
+            protocol: TCP
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet
+          value:
+            path: /readyz
+            port: prom-metrics
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet
+          value:
+            path: /livez
+            port: prom-metrics
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe.httpGet
+          value:
+            path: /readyz
+            port: prom-metrics
+
+  - it: gives caretta longer to stop than its own 20s shutdown timeout
+    asserts:
+      - equal:
+          path: spec.template.spec.terminationGracePeriodSeconds
+          value: 30
+
+  - it: sets memory and CPU limits by default
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resources
+          value:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 10m
+              memory: 256Mi
+
+  - it: runs on control-plane nodes by default
+    asserts:
+      - contains:
+          path: spec.template.spec.tolerations
+          content:
+            key: node-role.kubernetes.io/control-plane
+            operator: Exists
+            effect: NoSchedule
+
+  - it: uses the chart's service account by default
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: caretta
+
+  - it: uses an existing service account when told to
+    set:
+      serviceAccount.create: false
+      serviceAccount.name: my-sa
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: my-sa
+
+  - it: selects its pods with labels its pod template has
+    asserts:
+      - equal:
+          path: spec.selector.matchLabels
+          value:
+            app: caretta
+            app.kubernetes.io/name: caretta
+            app.kubernetes.io/instance: RELEASE-NAME
+      - isSubset:
+          path: spec.template.metadata.labels
+          content:
+            app: caretta
+            app.kubernetes.io/name: caretta
+            app.kubernetes.io/instance: RELEASE-NAME

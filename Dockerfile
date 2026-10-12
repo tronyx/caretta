@@ -23,6 +23,16 @@ RUN --mount=type=cache,target=/go/pkg/mod \
  && go vet ./... \
  && go test -race ./pkg/...
 
+# The eBPF integration tests, run as root on a real kernel (docker build --target integration-test --output DIR .)
+FROM builder AS integration-test-build
+ARG TARGETARCH
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOARCH=${TARGETARCH} go test -c -tags integration -o /caretta-integration.test ./pkg/caretta
+
+FROM scratch AS integration-test
+COPY --from=integration-test-build /caretta-integration.test /
+
 # gcr.io/distroless/static-debian13 (root variant: attaching kprobes requires uid 0)
 FROM gcr.io/distroless/static-debian13@sha256:58133991db06659feaabe0f4e97a35cebf15ef4ea08f8a4c6d2ee5f75e4aa6a0
 COPY --from=builder /src/bin/caretta /caretta
