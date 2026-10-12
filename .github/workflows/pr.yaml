@@ -33,10 +33,11 @@ jobs:
         name: Lint the chart
         run: helm lint chart
       -
-        # chart/tests; pinned to its digest, update by hand (Dependabot doesn't update images run this way)
+        # chart/tests; pinned to its digest, update by hand (Dependabot doesn't update images run this way).
+        # Runs as the runner's user so it can write to the checkout.
         name: Test the chart
         run: |
-          docker run --rm -v "$PWD/chart:/apps" \
+          docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD/chart:/apps" \
             helmunittest/helm-unittest:4.3.0-1.2.1@sha256:28ea86c3e0b07f501f0c2e9c08b9f41e240f4a4b571cb5106b36cf0f0607e989 .
 
   ebpf:

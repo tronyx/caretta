@@ -167,5 +167,5 @@ CI runs all of these on every pull request.
   docker build --target integration-test --output /tmp/integration .
   sudo /tmp/integration/caretta-integration.test -test.v
   ```
-* **Chart tests**: `docker run --rm -v "$PWD/chart:/apps" helmunittest/helm-unittest:4.3.0-1.2.1 .`
+* **Chart tests**: `docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD/chart:/apps" helmunittest/helm-unittest:4.3.0-1.2.1 .`
 * **End-to-end tests** on a kind cluster: build the image, load it with `kind load docker-image caretta:e2e`, then run `IMAGE_REPOSITORY=caretta IMAGE_TAG=e2e scripts/e2e.sh`. It installs the chart and the demo app on your current kubectl context.
