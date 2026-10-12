@@ -37,6 +37,7 @@ Releases are tagged `vX.Y.Z`; each one publishes the images `ghcr.io/tronyx/care
 - The Go profiler (`/debug/pprof`) is no longer served on the metrics port, where anyone who could reach the pod could pull heap dumps or run CPU profiles.
 - The `caretta_watcher_resets_count` metric, which informers have no equivalent for. `caretta_watcher_events_count` is still there, for pod, node and Service events.
 - Support for `batch/v1beta1` CronJobs, which Kubernetes removed in 1.25.
+- The chart's PodSecurityPolicy, its ClusterRole rule and the `rbac.pspEnabled` value. Kubernetes removed PodSecurityPolicy in 1.25, so they rendered on no supported cluster; Pod Security Admission replaces it, and the README says how to label caretta's namespace for it.
 
 ### Project
 

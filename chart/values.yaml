@@ -12,7 +12,6 @@ maxConnections: 1000000
 goMemLimit: 256MiB
 
 rbac:
-  pspEnabled: true
   sccEnabled: true
 image:
   # Also published as docker.io/tronyx/caretta
