@@ -9,6 +9,7 @@ Releases are tagged `vX.Y.Z`; each one publishes the images `ghcr.io/tronyx/care
 ### Project
 
 - `examples/astronomy-shop-values.yaml` deploys the OpenTelemetry Demo (the "Astronomy Shop") with Helm: a production-like shop of about 15 services in 10 languages, with gRPC, an Envoy edge proxy, Kafka, PostgreSQL, a Valkey cache, feature flags and a load generator, trimmed to fit on one node next to Caretta. The README now lists both example apps.
+- The Markdown files pass markdownlint, with the rules in `.markdownlint.json`. The README's broken "made by groundcover" link is fixed.
 
 ## [v0.2.0](https://github.com/tronyx/caretta/releases/tag/v0.2.0) · 2026-10-12
 
