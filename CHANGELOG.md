@@ -6,6 +6,14 @@ Releases are tagged `vX.Y.Z`; each one publishes the images `ghcr.io/tronyx/care
 
 ## Unreleased
 
+Nothing yet.
+
+## [v0.2.0](https://github.com/tronyx/caretta/releases/tag/v0.2.0) · 2026-10-12
+
+Bug fixes found by a new test suite, which now checks every change on real amd64 and arm64 kernels and on a kind cluster before anything is published.
+
+**Upgrading:** if you set `serviceAccount.create: false`, also set `serviceAccount.name` to the account caretta should use. Until now the chart created its own account regardless; without a name, caretta now runs as the namespace's `default` account, which can't read the cluster.
+
 ### Fixed
 
 - When two links ended up with the same labels, `caretta_links_observed` showed only one of them, picked at random on each poll, so its value could jump between scrapes and look like counter resets. Their byte counts are now added together.

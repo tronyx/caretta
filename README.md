@@ -36,11 +36,11 @@ Caretta demonstrates the power of using eBPF for observability solutions, which 
 As simple as installing a helm chart. It is recommended to install Caretta in a new, unique namespace.
 The chart is published as an OCI artifact on GHCR; see the [changelog](CHANGELOG.md) for newer versions than the one below.
 ```bash
-helm install caretta oci://ghcr.io/tronyx/charts/caretta --version 0.1.0 --namespace caretta --create-namespace
+helm install caretta oci://ghcr.io/tronyx/charts/caretta --version 0.2.0 --namespace caretta --create-namespace
 ```
 To see a chart's details or values before installing:
 ```bash
-helm show values oci://ghcr.io/tronyx/charts/caretta --version 0.1.0
+helm show values oci://ghcr.io/tronyx/charts/caretta --version 0.2.0
 ```
 
 ### Configuration
