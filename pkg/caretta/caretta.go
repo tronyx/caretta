@@ -78,9 +78,12 @@ func (caretta *Caretta) pollLoop(ctx context.Context, interval time.Duration) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			var links map[NetworkLink]uint64
-			var tcpConnections []TcpConnection
-			pastLinks, links, tcpConnections = caretta.tracer.TracesPollingIteration(pastLinks)
+			_, links, tcpConnections, err := caretta.tracer.TracesPollingIteration(pastLinks)
+			if err != nil {
+				// No heartbeat: liveness restarts caretta only if polls keep failing.
+				log.Printf("Skipping poll: %v", err)
+				continue
+			}
 			collector.update(links, tcpConnections)
 			caretta.health.Heartbeat()
 		}

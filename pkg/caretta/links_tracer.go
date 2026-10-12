@@ -3,6 +3,7 @@ package caretta
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"time"
@@ -34,6 +35,10 @@ var (
 	mapDeletions = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "caretta_connection_deletions",
 		Help: "total number of deletions from the map done by the userspace",
+	})
+	failedMapIterations = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "caretta_failed_map_iterations",
+		Help: "Counter of polls skipped because reading the connections map failed partway",
 	})
 )
 
@@ -88,8 +93,9 @@ func (tracer *LinksTracer) Stop() error {
 }
 
 // a single polling from the eBPF maps
-// iterating the traces from the kernel-space, summing each network link
-func (tracer *LinksTracer) TracesPollingIteration(pastLinks map[NetworkLink]uint64) (map[NetworkLink]uint64, map[NetworkLink]uint64, []TcpConnection) {
+// iterating the traces from the kernel-space, summing each network link.
+// If the map can't be read in full, nothing is deleted from it and an error is returned instead of partial results.
+func (tracer *LinksTracer) TracesPollingIteration(pastLinks map[NetworkLink]uint64) (map[NetworkLink]uint64, map[NetworkLink]uint64, []TcpConnection, error) {
 	// outline of an iteration -
 	// filter unwanted connections, sum all connections as links, add past links, and return the new map
 	pollsMade.Inc()
@@ -143,6 +149,10 @@ func (tracer *LinksTracer) TracesPollingIteration(pastLinks map[NetworkLink]uint
 			tracer.lastSeen[link] = now
 		}
 	}
+	if err := entries.Err(); err != nil {
+		failedMapIterations.Inc()
+		return pastLinks, nil, nil, fmt.Errorf("reading the connections map: %w", err)
+	}
 
 	mapSize.Set(float64(itemsCounter))
 	filteredLoopbackConnections.Set(float64(loopbackCounter))
@@ -159,7 +169,7 @@ func (tracer *LinksTracer) TracesPollingIteration(pastLinks map[NetworkLink]uint
 
 	tracer.expireIdleLinks(now, pastLinks, currentLinks)
 
-	return pastLinks, currentLinks, currentTcpConnections
+	return pastLinks, currentLinks, currentTcpConnections, nil
 
 }
 

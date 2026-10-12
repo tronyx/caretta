@@ -4,6 +4,7 @@ import "github.com/cilium/ebpf"
 
 type IEbpfMapIterator interface {
 	Next(interface{}, interface{}) bool
+	Err() error
 }
 
 type IEbpfMap interface {
@@ -34,4 +35,8 @@ func (m *EbpfMap) Delete(key interface{}) error {
 
 func (it *EbpfMapIterator) Next(key interface{}, val interface{}) bool {
 	return it.innerIterator.Next(key, val)
+}
+
+func (it *EbpfMapIterator) Err() error {
+	return it.innerIterator.Err()
 }
