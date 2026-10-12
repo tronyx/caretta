@@ -76,8 +76,46 @@ jobs:
         name: Run the integration tests as root
         run: sudo "$RUNNER_TEMP/integration/caretta-integration.test" -test.v -test.count=1
 
-  build:
+  e2e:
+    name: End-to-end on kind
     needs: [test, ebpf]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v7
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+      -
+        name: Build the image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          platforms: linux/amd64
+          cache-from: type=gha
+          tags: caretta:e2e
+      -
+        name: Create a kind cluster
+        uses: helm/kind-action@v1.15.1
+        with:
+          cluster_name: caretta-e2e
+      -
+        name: Load the image into the cluster
+        run: kind load docker-image caretta:e2e --name caretta-e2e
+      -
+        # Installs the chart, runs the demo app, and checks the service map, Grafana and a clean shutdown
+        name: Run the end-to-end tests
+        env:
+          IMAGE_REPOSITORY: caretta
+          IMAGE_TAG: e2e
+        run: scripts/e2e.sh
+
+  build:
+    needs: [test, ebpf, e2e]
     runs-on: ubuntu-latest
     permissions:
       contents: read
