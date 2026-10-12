@@ -1,3 +1,6 @@
+> [!NOTE]
+> **This is a maintained fork of [groundcover-com/caretta](https://github.com/groundcover-com/caretta)**, which hasn't had a release since v0.0.17 in March 2025. It keeps Caretta current and secure: up-to-date dependencies and container images (each pinned to an explicit version, never `latest`), hardened security defaults, and reliability fixes. It's published as `ghcr.io/tronyx/caretta` and `docker.io/tronyx/caretta`, with the Helm chart at `oci://ghcr.io/tronyx/charts/caretta`. See the [changelog](CHANGELOG.md) for what's changed. Caretta was created by [groundcover](https://www.groundcover.com); this fork isn't affiliated with them.
+
 <div align="center">
   <h1>Caretta</h1>
   <p align="center">
@@ -31,14 +34,13 @@ Caretta demonstrates the power of using eBPF for observability solutions, which 
 
 ## Installing Caretta :zap:
 As simple as installing a helm chart. It is recommended to install Caretta in a new, unique namespace.
+The chart is published as an OCI artifact on GHCR; see the [changelog](CHANGELOG.md) for newer versions than the one below.
 ```bash
-helm repo add groundcover https://helm.groundcover.com/
+helm install caretta oci://ghcr.io/tronyx/charts/caretta --version 0.1.0 --namespace caretta --create-namespace
 ```
+To see a chart's details or values before installing:
 ```bash
-helm repo update
-```
-```bash
-helm install caretta --namespace caretta --create-namespace groundcover/caretta
+helm show values oci://ghcr.io/tronyx/charts/caretta --version 0.1.0
 ```
 
 ### Configuration
@@ -49,6 +51,11 @@ Useful values:
 * **pollIntervalSeconds** can be modified to specify the polling and publishing interval of new metrics from the kernel. *default: 5*
 * The built-in Victoria Metrics and Grafana instances can be disabled by changing the values **victoria-metrics-single.enabled** or **grafana.enabled** to false, accordingly. _default: true_
 * Caretta resolves Kubernetes entities to their owners by default. For example, a pod 'pod1' and another pod 'pod2' both belonging to a deployment 'deployment1' will be resolved to 'deployment1'. This can be disabled by setting **traverseUpHierarchy** to false. _default: true_
+* **linkTTL** sets how long a link stays in the metrics after it was last seen, as a duration such as `30m` or `6h`, so links between workloads that are gone don't pile up. Set it to `0` to keep every link for as long as Caretta runs. _default: 1h_
+* **maxConnections** is how many connections Caretta can track on each node at once: those open, plus those closed since the last poll. The kernel reserves memory for all of them when Caretta starts, about 192 MiB at the default, scaling linearly, and it counts against Caretta's memory limit. When the table is full, new connections aren't tracked; `caretta_ebpf_connections_map_size` shows how full it is. Lowering it saves memory on every node. _default: 1000000_
+* **logFormat** chooses how Caretta writes its logs: `json`, one JSON object per line with a level and separate fields, for log collectors such as Fluent Bit or Promtail, or `text`, easier to read in `kubectl logs`. _default: json_
+* **resources** and **goMemLimit** set Caretta's CPU and memory. The memory limit has to cover the `maxConnections` memory above plus Caretta itself, and **goMemLimit** should stay below the limit minus that kernel memory, so Go frees memory before the pod runs out. If you change `maxConnections`, adjust them to match. _defaults: limit 512Mi, request 256Mi, goMemLimit 256MiB_
+* **networkPolicy.enabled** adds NetworkPolicies that only let the bundled VictoriaMetrics scrape Caretta and only the bundled Grafana query VictoriaMetrics, and limit both to DNS and the Kubernetes API server on the way out. Your cluster's network plugin has to enforce NetworkPolicy. To let something else in, such as your own Prometheus, add NetworkPolicy peers to **networkPolicy.metricsFrom** (Caretta) or **networkPolicy.queryFrom** (VictoriaMetrics). The API server rule allows any address on ports 443 and 6443; narrow **networkPolicy.apiServer.cidrs** to your API server's addresses. Grafana's own **grafana.networkPolicy** values control who can reach Grafana. _default: false_
 
 
 Example yaml for overriding these values:
@@ -76,7 +83,9 @@ helm delete caretta --namespace caretta
 Note that if persistent storage was enabled in the installation, it may not be deleted automatically by this command.
 
 ## Requirements
-* Linux kernel version >= 4.16
+* Linux kernel version >= 5.8 with the default `securityContext` (uses the `BPF` and `PERFMON` capabilities). On kernels 4.16–5.7, replace those capabilities with `SYS_ADMIN` in **securityContext.capabilities.add**.
+* tracefs available on the host at `/sys/kernel/tracing` (override with **tracefsPath**, e.g. `/sys/kernel/debug/tracing`).
+* The namespace must allow privileged workloads under Pod Security Admission (`pod-security.kubernetes.io/enforce: privileged`).
 * <a href="https://nakryiko.com/posts/bpf-portability-and-co-re/">CO-RE</a> support. Supported linux distributions can be found <a href="https://github.com/libbpf/libbpf#bpf-co-re-compile-once--run-everywhere">here</a>. Specifically, Docker for Mac uses a distribution which is not currently supported.
 
 
@@ -85,16 +94,22 @@ Note that if persistent storage was enabled in the installation, it may not be d
 Caretta's helm chart ships an instance of Grafana with a predefined dashboard using data published by Caretta. This dashboard contains some examples to demonstrate the usage of Caretta's metrics.
 
 ### Using the provided Grafana instance
-To access Grafana, port-forward port `3000` from the Grafana pod in Caretta's namespace.
-
-Using *kubectl*, it should look something like this:
+To access Grafana, port-forward its Service in Caretta's namespace, then open http://localhost:3000:
 
 ```bash
-kubectl port-forward --namespace caretta <grafana-pod-name> 3000:3000
+kubectl port-forward --namespace caretta svc/caretta-grafana 3000:80
 ```
 
-> **_NOTE:_**  Anonymous mode is enabled, making the default dashboard accessible with no login needed.
->              To edit the default dashboard or create your own dashboard, use the default administrator's credentials user:`admin` ; password:`caretta`.
+Log in as `admin`. The password is generated at install time and kept across upgrades; to read it:
+
+```bash
+kubectl get secret --namespace caretta caretta-grafana -o jsonpath='{.data.admin-password}' | base64 -d; echo
+```
+
+To use a password from your own Secret instead, set **grafana.admin.existingSecret** to its name (with the keys `admin-user` and `admin-password`). To let anyone who can reach Grafana view the dashboards without logging in, set **grafana.grafana\.ini.auth\.anonymous.enabled** to `true`.
+
+> [!IMPORTANT]
+> Releases of Caretta before this fork used the fixed password `caretta` with anonymous access on. When you upgrade, use `helm upgrade --reset-then-reuse-values` (or pass your values again with `-f`): plain `--reuse-values` also keeps the old chart's defaults, password and anonymous access included. An upgrade also keeps whatever password is already in the `caretta-grafana` Secret; to get a new random one, delete that Secret, upgrade, then restart Grafana with `kubectl rollout restart --namespace caretta deployment/caretta-grafana`. If you enabled Grafana persistence, Grafana keeps the password stored in its database instead, so change it after logging in, under your profile.
 
 ### Scraping Caretta's metrics
 

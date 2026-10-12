@@ -1,3 +1,7 @@
+# DEPRECATED - NO LONGER NEEDED.
+# This mirrored Grafana/VictoriaMetrics images to quay.io/groundcover. The chart now pulls
+# pinned upstream images directly, so nothing consumes these mirrors. Renamed to .OLD so
+# GitHub Actions no longer runs it; kept for reference only.
 name: subcharts-images
 
 on:

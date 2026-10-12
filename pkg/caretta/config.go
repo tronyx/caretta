@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 )
 
 const (
@@ -12,6 +13,8 @@ const (
 	defaultPollingIntervalSeconds = 5
 	defaultShouldResolveDns       = false
 	defaultTraverseUpHierarchy    = true
+	defaultLinkTTL                = time.Hour
+	defaultMaxConnections         = 1_000_000
 )
 
 type carettaConfig struct {
@@ -20,6 +23,8 @@ type carettaConfig struct {
 	prometheusEndpoint     string
 	pollingIntervalSeconds int
 	traverseUpHierarchy    bool
+	linkTTL                time.Duration
+	maxConnections         uint32
 }
 
 // environment variables based, encapsulated to enable future changes
@@ -40,7 +45,7 @@ func readConfig() carettaConfig {
 	interval := defaultPollingIntervalSeconds
 	if val := os.Getenv("POLL_INTERVAL"); val != "" {
 		valInt, err := strconv.Atoi(val)
-		if err == nil {
+		if err == nil && valInt > 0 {
 			interval = valInt
 		}
 	}
@@ -61,11 +66,29 @@ func readConfig() carettaConfig {
 		}
 	}
 
+	linkTTL := defaultLinkTTL
+	if val := os.Getenv("LINK_TTL"); val != "" {
+		valDuration, err := time.ParseDuration(val)
+		if err == nil && valDuration >= 0 {
+			linkTTL = valDuration
+		}
+	}
+
+	maxConnections := uint32(defaultMaxConnections)
+	if val := os.Getenv("MAX_CONNECTIONS"); val != "" {
+		valUint, err := strconv.ParseUint(val, 10, 32)
+		if err == nil && valUint > 0 {
+			maxConnections = uint32(valUint)
+		}
+	}
+
 	return carettaConfig{
 		shouldResolveDns:       shouldResolveDns,
 		prometheusPort:         port,
 		prometheusEndpoint:     endpoint,
 		pollingIntervalSeconds: interval,
 		traverseUpHierarchy:    traverseUpHierarchy,
+		linkTTL:                linkTTL,
+		maxConnections:         maxConnections,
 	}
 }

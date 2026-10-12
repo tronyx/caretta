@@ -3,13 +3,23 @@ prometheusPort: 7117
 prometheusEndpoint: "/metrics"
 pollIntervalSeconds: 5
 traverseUpHierarchy: true
+# Drop a link from the metrics once it hasn't been seen for this long (Go duration); "0" keeps links forever.
+linkTTL: 1h
+# Connections tracked per node. The kernel reserves memory for all of them up front, counted against
+# resources.limits.memory: about 192 MiB at 1,000,000, scaling linearly.
+maxConnections: 1000000
+# Go's soft memory limit. Keep it below resources.limits.memory minus the maxConnections memory above.
+goMemLimit: 256MiB
+# Log format: json (one JSON object per line, for log collectors) or text.
+logFormat: json
 
 rbac:
-  pspEnabled: true
   sccEnabled: true
 image:
-  repository: quay.io/groundcover/caretta
-  pullPolicy: Always
+  # Also published as docker.io/tronyx/caretta
+  repository: ghcr.io/tronyx/caretta
+  pullPolicy: IfNotPresent
+  # Defaults to the chart appVersion; never use "latest"
   tag: ""
 
 imagePullSecrets: []
@@ -18,11 +28,11 @@ fullnameOverride: ""
 
 resources:
   limits:
-    cpu: 150m
-    memory: 500Mi
+    cpu: 500m
+    memory: 512Mi
   requests:
     cpu: 10m
-    memory: 50Mi
+    memory: 256Mi
 
 serviceAccount:
   # Specifies whether a service account should be created
@@ -35,18 +45,28 @@ serviceAccount:
 
 podAnnotations: {}
 
-podSecurityContext: {}
-  # fsGroup: 2000
+podSecurityContext:
+  seccompProfile:
+    type: RuntimeDefault
 
+# Root is required to attach kprobes/tracepoints, so lock it down to the minimum capabilities instead.
 securityContext:
-  privileged: true
+  privileged: false
+  runAsUser: 0
+  runAsNonRoot: false
+  allowPrivilegeEscalation: false
   readOnlyRootFilesystem: true
-  # capabilities:
-  #   drop:
-  #   - ALL
-  # readOnlyRootFilesystem: true
-  # runAsNonRoot: true
-  # runAsUser: 1000
+  capabilities:
+    drop:
+      - ALL
+    # SYS_RESOURCE is only needed on kernels < 5.11; replace BPF/PERFMON with SYS_ADMIN on kernels < 5.8
+    add:
+      - BPF
+      - PERFMON
+      - SYS_RESOURCE
+
+# Host tracefs mount used to resolve tracepoint IDs
+tracefsPath: /sys/kernel/tracing
 
 tolerations:
   - key: node-role.kubernetes.io/control-plane
@@ -60,18 +80,54 @@ nodeSelector: {}
 affinity: {}
 priorityClassName:
 
+# Only allow the traffic caretta and VictoriaMetrics need. Requires a CNI that enforces NetworkPolicy.
+networkPolicy:
+  enabled: false
+  # Extra NetworkPolicy peers allowed to scrape caretta's metrics, e.g. your own Prometheus
+  metricsFrom: []
+  # Extra NetworkPolicy peers allowed to query VictoriaMetrics, besides the bundled Grafana
+  queryFrom: []
+  # The Kubernetes API server, which caretta and VictoriaMetrics watch. Both ports are listed because
+  # most CNIs check the endpoint (often 6443) behind the kubernetes Service (443). Narrow the CIDRs
+  # to your API server's addresses: kubectl get endpointslices -n default -l kubernetes.io/service-name=kubernetes
+  apiServer:
+    cidrs:
+      - 0.0.0.0/0
+      - ::/0
+    ports:
+      - 443
+      - 6443
+
 victoria-metrics-single:
+  enabled: true
   server:
     image:
-      repository: quay.io/groundcover/victoria-metrics
+      registry: docker.io
+      repository: victoriametrics/victoria-metrics
+      tag: v1.153.0
     resources:
       limits:
         cpu: 300m
         memory: 350Mi
       requests:
         cpu: 5m
-        memory: 50Mi
+        memory: 96Mi
     fullnameOverride: caretta-vm
+    podSecurityContext:
+      enabled: true
+      runAsNonRoot: true
+      runAsUser: 65534
+      runAsGroup: 65534
+      fsGroup: 65534
+      seccompProfile:
+        type: RuntimeDefault
+    securityContext:
+      enabled: true
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop:
+          - ALL
     persistentVolume:
        enabled: false
        size: 16Gi # change enabled to true if you pv is required
@@ -107,15 +163,37 @@ victoria-metrics-single:
                 target_label: caretta_node
 
 grafana:
+  enabled: true
   image:
-    repository: quay.io/groundcover/grafana
+    registry: docker.io
+    repository: grafana/grafana
+    tag: 13.2.3-distroless
+  testFramework:
+    image:
+      registry: docker.io
+      repository: bats/bats
+      tag: 1.14.0
+  initChownData:
+    image:
+      registry: docker.io
+      repository: library/busybox
+      tag: 1.38.0
+  downloadDashboardsImage:
+    registry: docker.io
+    repository: curlimages/curl
+    tag: 8.22.0
+  imageRenderer:
+    image:
+      registry: docker.io
+      repository: grafana/grafana-image-renderer
+      tag: v5.12.5
   resources:
     limits:
-      memory: 300Mi
+      memory: 512Mi
       cpu: 300m
     requests:
-      memory: 50Mi
-      cpu: 5m
+      memory: 320Mi
+      cpu: 25m
   datasources:
     datasources.yaml:
       apiVersion: 1
@@ -127,6 +205,10 @@ grafana:
         editable: "true"
 
   sidecar:
+    image:
+      registry: quay.io
+      repository: kiwigrid/k8s-sidecar
+      tag: 2.14.1
     dashboards:
       label: grafana_dashboard
       labelValue: ""
@@ -149,9 +231,11 @@ grafana:
     default: "caretta-grafana-dashboards"
 
   grafana.ini:
+    # Set enabled to true to let anyone who can reach Grafana view dashboards without logging in.
     auth.anonymous:
-      enabled: true
+      enabled: false
     dashboards:
       default_home_dashboard_path: /var/lib/grafana/dashboards/default/dashboard.json
   adminUser: "admin"
-  adminPassword: "caretta"
+  # No adminPassword: a random one is generated into the caretta-grafana Secret and kept across upgrades.
+  # To use your own Secret instead, set admin.existingSecret.

@@ -1,0 +1,49 @@
+version: 2
+# All pull requests target develop, the default branch.
+updates:
+  # The actions in .github/workflows, so CI doesn't break when GitHub retires
+  # an old major version.
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # The Go modules in go.mod, including the bpf2go tool. The k8s.io modules
+  # are released together and must move together. A cilium/ebpf update
+  # regenerates the eBPF objects in the image build, so the pull request's
+  # build checks that the C code still loads with it.
+  - package-ecosystem: gomod
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+    groups:
+      kubernetes:
+        patterns: ["k8s.io/*", "sigs.k8s.io/*"]
+      go-minor-and-patch:
+        update-types: ["minor", "patch"]
+
+  # The Go builder and the distroless runtime in the Dockerfile. The runtime is
+  # pinned by digest; Dependabot moves the digest when Google republishes it
+  # with security fixes, which is the only way those fixes reach the image.
+  - package-ecosystem: docker
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+
+  # The VictoriaMetrics and Grafana subcharts in Chart.yaml, and the images
+  # pinned in values.yaml. The caretta image's tag is empty (it follows the
+  # chart's appVersion), so Dependabot leaves it alone.
+  - package-ecosystem: helm
+    directory: /chart
+    target-branch: develop
+    schedule:
+      interval: weekly
+    groups:
+      subcharts-and-images:
+        patterns: ["*"]

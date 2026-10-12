@@ -37,6 +37,10 @@ func (mi *MockConnectionsMapIterator) Next(conn interface{}, throughput interfac
 	return false
 }
 
+func (mi *MockConnectionsMapIterator) Err() error {
+	return nil
+}
+
 type MockConnectionsMap struct {
 	innerMap map[caretta.ConnectionIdentifier]caretta.ConnectionThroughputStats
 }
@@ -360,7 +364,7 @@ func TestAggregations(t *testing.T) {
 			var currentLinks map[caretta.NetworkLink]uint64
 			for _, connection := range test.connections {
 				m.Update(connection.connId, connection.throughput)
-				_, currentLinks, _ = tracer.TracesPollingIteration(pastLinks)
+				_, currentLinks, _, _ = tracer.TracesPollingIteration(pastLinks)
 			}
 			resultThroughput, ok := currentLinks[test.expectedLink]
 			assert.True(ok, "expected link not in result map")
@@ -390,7 +394,7 @@ func TestDeletion_ActiveConnection_NotDeleted(t *testing.T) {
 
 	// Act
 	m.Update(conn1, throughput1)
-	_, currentLinks, _ := tracer.TracesPollingIteration(pastLinks)
+	_, currentLinks, _, _ := tracer.TracesPollingIteration(pastLinks)
 
 	// Assert
 	resultThroughput, ok := currentLinks[serverLink]
@@ -422,12 +426,12 @@ func TestDeletion_InactiveConnection_AddedToPastLinksAndRemovedFromMap(t *testin
 
 	pastLinks := make(map[caretta.NetworkLink]uint64)
 
-	pastLinks, _, _ = tracer.TracesPollingIteration(pastLinks)
+	pastLinks, _, _, _ = tracer.TracesPollingIteration(pastLinks)
 
 	// Act: update the throughput so the connection is inactive, and iterate
 	throughput2 := inactiveThroughput
 	m.Update(conn1, throughput2)
-	pastLinks, currentLinks, _ := tracer.TracesPollingIteration(pastLinks)
+	pastLinks, currentLinks, _, _ := tracer.TracesPollingIteration(pastLinks)
 
 	// Assert: check the past connection is both in past links and in current links
 	resultThroughput, ok := currentLinks[serverLink]
@@ -463,12 +467,12 @@ func TestDeletion_InactiveConnection_NewConnectionAfterDeletionUpdatesCorrectly(
 	// update the throughput so the connection is inactive
 	throughput2 := inactiveThroughput
 	m.Update(conn1, throughput2)
-	pastLinks, _, _ = tracer.TracesPollingIteration(pastLinks)
+	pastLinks, _, _, _ = tracer.TracesPollingIteration(pastLinks)
 
 	// Act: new connection, same link
 	throughput3 := activeThroughput
 	m.Update(conn1, throughput3)
-	_, currentLinks, _ := tracer.TracesPollingIteration(pastLinks)
+	_, currentLinks, _, _ := tracer.TracesPollingIteration(pastLinks)
 
 	// Assert the new connection is aggregated correctly
 	resultThroughput, ok := currentLinks[serverLink]
@@ -496,7 +500,7 @@ func TestConnectionState_Open(t *testing.T) {
 
 	// Act
 	m.Update(conn1, throughput1)
-	_, _, currentConnections := tracer.TracesPollingIteration(pastLinks)
+	_, _, currentConnections, _ := tracer.TracesPollingIteration(pastLinks)
 
 	// Assert
 	assert.Equal(1, len(currentConnections))
@@ -527,7 +531,7 @@ func TestConnectionState_Close(t *testing.T) {
 
 	// Act
 	m.Update(conn1, throughput1)
-	_, _, currentConnections := tracer.TracesPollingIteration(pastLinks)
+	_, _, currentConnections, _ := tracer.TracesPollingIteration(pastLinks)
 
 	// Assert
 	assert.Equal(1, len(currentConnections))
@@ -557,7 +561,7 @@ func TestConnectionState_Accept(t *testing.T) {
 
 	// Act
 	m.Update(conn1, throughput1)
-	_, _, currentConnections := tracer.TracesPollingIteration(pastLinks)
+	_, _, currentConnections, _ := tracer.TracesPollingIteration(pastLinks)
 
 	// Assert
 	assert.Equal(1, len(currentConnections))
@@ -587,7 +591,7 @@ func TestConnectionState_UnknownRole(t *testing.T) {
 
 	// Act
 	m.Update(conn1, throughput1)
-	_, _, currentConnections := tracer.TracesPollingIteration(pastLinks)
+	_, _, currentConnections, _ := tracer.TracesPollingIteration(pastLinks)
 
 	// Assert
 	assert.Equal(0, len(currentConnections))
