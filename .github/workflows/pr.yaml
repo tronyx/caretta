@@ -127,11 +127,12 @@ jobs:
           sudo apt-get install -y -q --no-install-recommends qemu-system-x86
           sudo chmod 0666 /dev/kvm
       -
-        # The VM settings are in .vimto.toml
+        # The VM settings are in .vimto.toml. vimto hands its stdin to the VM's console, so it gets /dev/null.
+        # SIGQUIT makes a hung vimto print its goroutines before it stops.
         name: Run the integration tests in the VM
         run: |
-          vimto -kernel ":${{ matrix.kernel }}" exec -- /bin/sh -c 'uname -srm && ls -l /sys/kernel/btf/vmlinux'
-          vimto -kernel ":${{ matrix.kernel }}" exec -- "$RUNNER_TEMP/integration/caretta-integration.test" -test.v -test.count=1
+          timeout -s QUIT -k 30s 3m vimto -kernel ":${{ matrix.kernel }}" exec -- /bin/sh -c 'uname -srm && ls -l /sys/kernel/btf/vmlinux' < /dev/null
+          timeout -s QUIT -k 30s 5m vimto -kernel ":${{ matrix.kernel }}" exec -- "$RUNNER_TEMP/integration/caretta-integration.test" -test.v -test.count=1 < /dev/null
 
   e2e:
     name: End-to-end on kind
