@@ -93,6 +93,11 @@ Note that if persistent storage was enabled in the installation, it may not be d
 ## Working with Caretta :turtle:
 Caretta's helm chart ships an instance of Grafana with a predefined dashboard using data published by Caretta. This dashboard contains some examples to demonstrate the usage of Caretta's metrics.
 
+### Example workloads
+To give Caretta something to map, the `examples` folder has two apps, each with install and cleanup instructions at the top of its file:
+* [`demo-shop.yaml`](examples/demo-shop.yaml): a small app (a load generator, an nginx frontend and API, and Postgres), deployed with `kubectl apply`.
+* [`astronomy-shop-values.yaml`](examples/astronomy-shop-values.yaml): Helm values for the [OpenTelemetry Demo](https://opentelemetry.io/docs/demo/), a production-like shop of about 15 services in 10 languages, with gRPC, an Envoy edge proxy, Kafka, PostgreSQL, a Valkey cache, feature flags and a load generator. It's trimmed to fit on one node next to Caretta, and its feature flags can inject failures, such as a failing payment service, to watch the service map change.
+
 ### Using the provided Grafana instance
 To access Grafana, port-forward its Service in Caretta's namespace, then open http://localhost:3000:
 
