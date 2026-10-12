@@ -97,7 +97,7 @@ Note that if persistent storage was enabled in the installation, it may not be d
 * Linux kernel version >= 5.8 with the default `securityContext` (uses the `BPF` and `PERFMON` capabilities). On kernels 4.16–5.7, replace those capabilities with `SYS_ADMIN` in **securityContext.capabilities.add**.
 * tracefs available on the host at `/sys/kernel/tracing` (override with **tracefsPath**, e.g. `/sys/kernel/debug/tracing`).
 * The namespace must allow privileged workloads under Pod Security Admission (`pod-security.kubernetes.io/enforce: privileged`).
-* [CO-RE](https://nakryiko.com/posts/bpf-portability-and-co-re/) support. Supported linux distributions are listed in [libbpf's README](https://github.com/libbpf/libbpf#bpf-co-re-compile-once--run-everywhere). Specifically, Docker for Mac uses a distribution which is not currently supported.
+* [CO-RE](https://nakryiko.com/posts/bpf-portability-and-co-re/) support. Supported linux distributions are listed in [libbpf's README](https://github.com/libbpf/libbpf#bpf-co-re-compile-once--run-everywhere). Docker Desktop works too, for example with a kind cluster on a Mac: recent releases run a Linux kernel with BTF (tested with Linux 7.0).
 
 ## Working with Caretta :turtle:
 
