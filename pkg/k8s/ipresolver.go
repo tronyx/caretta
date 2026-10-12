@@ -4,11 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"net"
 	"sync"
 	"time"
 
-	lrucache "github.com/hashicorp/golang-lru/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	appsv1 "k8s.io/api/apps/v1"
@@ -48,9 +46,8 @@ type ipEntry struct {
 
 type K8sIPResolver struct {
 	clientset           kubernetes.Interface
-	shouldResolveDns    bool
 	traverseUpHierarchy bool
-	dnsResolvedIps      *lrucache.Cache[string, string]
+	dns                 *reverseDNS // nil when DNS resolving is off
 
 	ipsMu sync.RWMutex
 	ips   map[string]ipEntry
@@ -69,19 +66,18 @@ type K8sIPResolver struct {
 }
 
 func NewK8sIPResolver(clientset kubernetes.Interface, resolveDns bool, traverseUpHierarchy bool) (*K8sIPResolver, error) {
-	var dnsCache *lrucache.Cache[string, string]
+	var dns *reverseDNS
 	if resolveDns {
 		var err error
-		dnsCache, err = lrucache.New[string, string](MAX_RESOLVED_DNS)
+		dns, err = newReverseDNS(MAX_RESOLVED_DNS)
 		if err != nil {
 			return nil, err
 		}
 	}
 	return &K8sIPResolver{
 		clientset:           clientset,
-		shouldResolveDns:    resolveDns,
 		traverseUpHierarchy: traverseUpHierarchy,
-		dnsResolvedIps:      dnsCache,
+		dns:                 dns,
 		ips:                 make(map[string]ipEntry),
 		stopCh:              make(chan struct{}),
 	}, nil
@@ -98,17 +94,8 @@ func (resolver *K8sIPResolver) ResolveIP(ip string) Workload {
 	}
 
 	host := ip
-	if resolver.shouldResolveDns {
-		val, ok := resolver.dnsResolvedIps.Get(ip)
-		if ok {
-			host = val
-		} else {
-			hosts, err := net.LookupAddr(ip)
-			if err == nil && len(hosts) > 0 {
-				host = hosts[0]
-			}
-			resolver.dnsResolvedIps.Add(ip, host)
-		}
+	if resolver.dns != nil {
+		host = resolver.dns.name(ip)
 	}
 	return Workload{
 		Name:      host,
@@ -119,6 +106,9 @@ func (resolver *K8sIPResolver) ResolveIP(ip string) Workload {
 
 // StartWatching returns once every cache is synced and the initial IP mapping is built.
 func (resolver *K8sIPResolver) StartWatching() error {
+	if resolver.dns != nil {
+		resolver.dns.start(resolver.stopCh)
+	}
 	factory := informers.NewSharedInformerFactoryWithOptions(resolver.clientset, 0, informers.WithTransform(trimForCache))
 
 	pods := factory.Core().V1().Pods().Informer()
