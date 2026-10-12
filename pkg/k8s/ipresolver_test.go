@@ -361,7 +361,7 @@ func runTest(t *testing.T, test testScenario) {
 			podObj := generatePod(modifiedPod)
 			modifyObject(fakeWatchers, podObj, "Pod")
 		}
-		for _, modifiedWorkloadResource := range step.newWorkloadResource {
+		for _, modifiedWorkloadResource := range step.modifiedWorkloadResources {
 			obj := generateWorkloadResource(modifiedWorkloadResource)
 			modifyObject(fakeWatchers, obj, modifiedWorkloadResource.Kind)
 		}

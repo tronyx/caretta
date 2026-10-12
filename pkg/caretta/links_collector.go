@@ -68,18 +68,23 @@ func (c *linksCollector) Collect(ch chan<- prometheus.Metric) {
 func (c *linksCollector) update(links map[NetworkLink]uint64, tcpConnections []TcpConnection) {
 	linkPoints := make(map[string]labeledValue, len(links))
 	for link, throughput := range links {
-		addPoint(linkPoints, linkLabelValues(link.Client, link.Server, link.ServerPort, link.Role), float64(throughput))
+		addPoint(linkPoints, linkLabelValues(link.Client, link.Server, link.ServerPort, link.Role), float64(throughput), true)
 	}
 	tcpPoints := make(map[string]labeledValue, len(tcpConnections))
 	for _, connection := range tcpConnections {
-		addPoint(tcpPoints, linkLabelValues(connection.Client, connection.Server, connection.ServerPort, connection.Role), float64(connection.State))
+		addPoint(tcpPoints, linkLabelValues(connection.Client, connection.Server, connection.ServerPort, connection.Role), float64(connection.State), false)
 	}
 	c.latest.Store(&linksSnapshot{links: linkPoints, tcpStates: tcpPoints})
 }
 
 // Distinct links can share a label set (the server's owner isn't a label), and a duplicate would fail the whole scrape.
-func addPoint(points map[string]labeledValue, labels []string, value float64) {
-	points[strings.Join(labels, "\xff")] = labeledValue{labels: labels, value: value}
+// Byte counts are summed so the total doesn't depend on map order; states can't be summed, so the last one wins.
+func addPoint(points map[string]labeledValue, labels []string, value float64, sum bool) {
+	key := strings.Join(labels, "\xff")
+	if existing, ok := points[key]; ok && sum {
+		value += existing.value
+	}
+	points[key] = labeledValue{labels: labels, value: value}
 }
 
 func linkLabelValues(client, server caretta_k8s.Workload, serverPort uint16, role uint32) []string {

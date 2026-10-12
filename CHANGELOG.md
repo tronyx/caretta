@@ -6,7 +6,14 @@ Releases are tagged `vX.Y.Z`; each one publishes the images `ghcr.io/tronyx/care
 
 ## Unreleased
 
-Nothing yet.
+### Fixed
+
+- When two links ended up with the same labels, `caretta_links_observed` showed only one of them, picked at random on each poll, so its value could jump between scrapes and look like counter resets. Their byte counts are now added together.
+- A `PROMETHEUS_PORT` of `0`, a negative number or one above 65535 is ignored, like other invalid settings, instead of starting the metrics server on a random port that every probe then fails to reach.
+
+### Project
+
+- Unit tests now cover the health checks, the metrics server, configuration parsing, the poll loop and shutdown order (the eBPF maps are never unloaded while a poll is reading them), loopback filtering, and the resolver's handling of deleted pods, nodes and services. Coverage goes from 50% to 77%. A bug in the resolver's test harness, which never applied modified workload resources, is fixed.
 
 ## [v0.1.0](https://github.com/tronyx/caretta/releases/tag/v0.1.0) · 2026-10-12
 
