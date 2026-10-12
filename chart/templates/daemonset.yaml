@@ -80,6 +80,8 @@ spec:
               value: {{ .Values.linkTTL | quote }}
             - name: "MAX_CONNECTIONS"
               value: {{ .Values.maxConnections | int | quote }}
+            - name: "LOG_FORMAT"
+              value: {{ .Values.logFormat | quote }}
             {{- with .Values.goMemLimit }}
             - name: "GOMEMLIMIT"
               value: {{ . | quote }}

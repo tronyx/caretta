@@ -3,7 +3,7 @@ package k8s
 import (
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -298,7 +298,7 @@ func (resolver *K8sIPResolver) resolvePodDescriptor(pod *v1.Pod) Workload {
 			kind = owner.Kind
 			owner, err = resolver.getControllerOfOwner(pod.Namespace, owner)
 			if err != nil {
-				log.Printf("Warning: couldn't retrieve owner of %v - %v", name, err)
+				slog.Warn("Couldn't find a pod's owner; using the closest one found", "pod", pod.Namespace+"/"+pod.Name, "owner", name, "error", err)
 			}
 		}
 		result.Name = name

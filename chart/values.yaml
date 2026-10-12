@@ -10,6 +10,8 @@ linkTTL: 1h
 maxConnections: 1000000
 # Go's soft memory limit. Keep it below resources.limits.memory minus the maxConnections memory above.
 goMemLimit: 256MiB
+# Log format: json (one JSON object per line, for log collectors) or text.
+logFormat: json
 
 rbac:
   sccEnabled: true

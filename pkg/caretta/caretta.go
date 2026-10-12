@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -81,7 +81,7 @@ func (caretta *Caretta) pollLoop(ctx context.Context, interval time.Duration) {
 			_, links, tcpConnections, err := caretta.tracer.TracesPollingIteration(pastLinks)
 			if err != nil {
 				// No heartbeat: liveness restarts caretta only if polls keep failing.
-				log.Printf("Skipping poll: %v", err)
+				slog.Warn("Skipping poll", "error", err)
 				continue
 			}
 			collector.update(links, tcpConnections)
@@ -91,7 +91,7 @@ func (caretta *Caretta) pollLoop(ctx context.Context, interval time.Duration) {
 }
 
 func (caretta *Caretta) Stop(ctx context.Context) error {
-	log.Print("Stopping Caretta...")
+	slog.Info("Stopping Caretta")
 	caretta.cancelPoll()
 	select {
 	case <-caretta.pollDone: // never close BPF maps while an iteration is reading them

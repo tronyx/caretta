@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"time"
 
@@ -39,6 +39,11 @@ var (
 	failedMapIterations = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "caretta_failed_map_iterations",
 		Help: "Counter of polls skipped because reading the connections map failed partway",
+	})
+	pollDuration = promauto.NewHistogram(prometheus.HistogramOpts{
+		Name:    "caretta_poll_duration_seconds",
+		Help:    "Time spent on each poll: reading the connections map and resolving its connections into links",
+		Buckets: prometheus.ExponentialBuckets(0.001, 2, 14),
 	})
 )
 
@@ -96,6 +101,7 @@ func (tracer *LinksTracer) Stop() error {
 // iterating the traces from the kernel-space, summing each network link.
 // If the map can't be read in full, nothing is deleted from it and an error is returned instead of partial results.
 func (tracer *LinksTracer) TracesPollingIteration(pastLinks map[NetworkLink]uint64) (map[NetworkLink]uint64, map[NetworkLink]uint64, []TcpConnection, error) {
+	defer prometheus.NewTimer(pollDuration).ObserveDuration()
 	// outline of an iteration -
 	// filter unwanted connections, sum all connections as links, add past links, and return the new map
 	pollsMade.Inc()
@@ -197,20 +203,20 @@ func (tracer *LinksTracer) deleteAndStoreConnection(conn *ConnectionIdentifier, 
 	var throughput ConnectionThroughputStats
 	err := tracer.connections.Lookup(conn, &throughput)
 	if err != nil {
-		log.Printf("Error retrieving connection to delete, skipping it: %v", err)
+		slog.Warn("Couldn't read a closed connection before deleting it; skipping it", "error", err)
 		failedConnectionDeletion.Inc()
 		return
 	}
 	err = tracer.connections.Delete(conn)
 	if err != nil {
-		log.Printf("Error deleting connection from map: %v", err)
+		slog.Warn("Couldn't delete a closed connection from the map", "error", err)
 		failedConnectionDeletion.Inc()
 		return
 	}
 	// if deletion is successful, add it to past links
 	link, err := tracer.reduceConnectionToLink(*conn)
 	if err != nil {
-		log.Printf("Error reducing connection to link when deleting: %v", err)
+		slog.Warn("Couldn't turn a deleted connection into a link", "error", err)
 		return
 	}
 

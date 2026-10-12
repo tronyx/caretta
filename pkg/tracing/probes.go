@@ -3,7 +3,7 @@ package tracing
 import (
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
@@ -34,24 +34,24 @@ func LoadProbes(maxConnections uint32) (Probes, *ebpf.Map, error) {
 	if err != nil {
 		var ve *ebpf.VerifierError
 		if errors.As(err, &ve) {
-			fmt.Printf("Verifier Error: %+v\n", ve)
+			slog.Error("The kernel's eBPF verifier rejected caretta's programs", "verifier_log", fmt.Sprintf("%+v", ve))
 		}
 		return Probes{}, nil, fmt.Errorf("error loading BPF objects from go-side. %v", err)
 	}
-	log.Printf("BPF objects loaded")
+	slog.Info("BPF objects loaded", "max_connections", maxConnections)
 
 	// attach a kprobe and tracepoint
 	kp, err := link.Kprobe("tcp_data_queue", objs.bpfPrograms.HandleTcpDataQueue, nil)
 	if err != nil {
 		return Probes{}, nil, fmt.Errorf("error attaching kprobe: %v", err)
 	}
-	log.Printf("Kprobe attached successfully")
+	slog.Info("Kprobe attached", "function", "tcp_data_queue")
 
 	tp, err := link.Tracepoint("sock", "inet_sock_set_state", objs.bpfPrograms.HandleSockSetState, nil)
 	if err != nil {
 		return Probes{}, nil, fmt.Errorf("error attaching tracepoint: %v", err)
 	}
-	log.Printf("Tracepoint attached successfully")
+	slog.Info("Tracepoint attached", "tracepoint", "sock/inet_sock_set_state")
 
 	return Probes{
 		Kprobe:     kp,

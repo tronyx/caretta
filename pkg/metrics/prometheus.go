@@ -2,9 +2,10 @@ package metrics
 
 import (
 	"errors"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/groundcover-com/caretta/pkg/health"
@@ -31,7 +32,8 @@ func StartMetricsServer(endpoint string, port string, hc *health.Checker) (*http
 	}
 	go func() {
 		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("Prometheus server on port %v failed: %v", port, err)
+			slog.Error("Metrics server failed", "port", port, "error", err)
+			os.Exit(1)
 		}
 	}()
 	return server, nil

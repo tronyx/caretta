@@ -2,25 +2,35 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
+	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
 	"github.com/groundcover-com/caretta/pkg/caretta"
+	"k8s.io/klog/v2"
 )
 
 // Must stay below the pod's terminationGracePeriodSeconds (30s).
 const shutdownTimeout = 20 * time.Second
 
 func main() {
-	log.Print("Caretta starting...")
+	var handler slog.Handler = slog.NewJSONHandler(os.Stderr, nil)
+	if os.Getenv("LOG_FORMAT") == "text" {
+		handler = slog.NewTextHandler(os.Stderr, nil)
+	}
+	slog.SetDefault(slog.New(handler))
+	klog.SetSlogLogger(slog.Default())
+
+	slog.Info("Caretta starting")
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
 	c := caretta.NewCaretta()
 	if err := c.Start(); err != nil {
-		log.Fatalf("Startup failed: %v", err)
+		slog.Error("Startup failed", "error", err)
+		os.Exit(1)
 	}
 
 	<-ctx.Done()
@@ -29,6 +39,7 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	if err := c.Stop(shutdownCtx); err != nil {
-		log.Fatalf("Unclean shutdown: %v", err)
+		slog.Error("Unclean shutdown", "error", err)
+		os.Exit(1)
 	}
 }
