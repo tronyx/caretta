@@ -30,3 +30,6 @@ go.work
 bin/
 vendor/
 
+# Python bytecode
+__pycache__/
+

@@ -1,201 +1,192 @@
-> [!NOTE]
-> **This is a maintained fork of [groundcover-com/caretta](https://github.com/groundcover-com/caretta)**, which hasn't had a release since v0.0.17 in March 2025. It keeps Caretta current and secure: up-to-date dependencies and container images (each pinned to an explicit version, never `latest`), hardened security defaults, and reliability fixes. It's published as `ghcr.io/tronyx/caretta` and `docker.io/tronyx/caretta`, with the Helm chart at `oci://ghcr.io/tronyx/charts/caretta`. See the [changelog](CHANGELOG.md) for what's changed. Caretta was created by [groundcover](https://www.groundcover.com); this fork isn't affiliated with them.
-
 <div align="center">
-  <h1>Caretta</h1>
-  <p align="center">
-    <img src="images/logo.svg" width="25%" alt="caretta" title="caretta" />
-   <br><br>
-   <a href="https://www.producthunt.com/posts/caretta?utm_source=badge-top-post-topic-badge&utm_medium=badge&utm_souce=badge-caretta" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/top-post-topic-badge.svg?post_id=373791&theme=neutral&period=weekly&topic_id=267" alt="Caretta - Instant&#0032;K8s&#0032;service&#0032;dependency&#0032;map&#0044;&#0032;right&#0032;to&#0032;your&#0032;Grafana | Product Hunt" width="25%"/></a>
-  </p>
-    <h2>Instant K8s service dependency map, right to your Grafana.</h2>
-    <h4> made by <a href="https://www.groundcover.com">groundcover</a></h4>
-  <p>
 
-[![slack](https://img.shields.io/badge/slack-groundcover-yellowgreen.svg?logo=slack)](http://www.groundcover.com/join-slack)
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-<br>
+<img src="images/logo.svg" width="25%" alt="Caretta logo">
+
+# Caretta
+
+A service dependency map for Kubernetes, shown in Grafana
+
+[![Build](https://img.shields.io/github/actions/workflow/status/tronyx/caretta/pr.yaml?branch=develop&label=build)](https://github.com/tronyx/caretta/actions/workflows/pr.yaml)
+[![Release](https://img.shields.io/github/v/release/tronyx/caretta)](https://github.com/tronyx/caretta/releases/latest)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache_2.0-blue.svg)](LICENSE)
+[![Slack: groundcover](https://img.shields.io/badge/slack-groundcover-yellowgreen.svg?logo=slack)](http://www.groundcover.com/join-slack)
 
 </div>
 
+> [!NOTE]
+> This is a maintained fork of [groundcover-com/caretta](https://github.com/groundcover-com/caretta). [groundcover](https://www.groundcover.com) created Caretta. This fork is not affiliated with groundcover. The last upstream release was v0.0.17, in March 2025. This fork keeps the dependencies and container images up to date, uses stricter security defaults, and fixes reliability problems. The [changelog](CHANGELOG.md) lists each change.
+
 <p align="center">
-    <img src="images/caretta.gif" width="90%" alt="caretta-screenshot" title="caretta-screenshot">
+  <img src="images/caretta.gif" width="90%" alt="The Caretta service map in Grafana">
 </p>
 
-## What is Caretta?
+## What Caretta does
 
-Caretta is a lightweight, standalone tool that instantly creates a visual network map of the services running in your cluster.
+Caretta draws a map of the network connections between the workloads in your cluster. It shows which workload talks to which, on which port, and how much data they send.
 
-Carreta leverages eBPF to efficiently map all service network interactions in a K8s  cluster, and Grafana to query and visualize the collected data.
+Caretta has three parts, and one Helm chart installs all of them:
 
-Carreta is built to be efficient, with a minimal footprint on the system, and does not require any modifications of the cluster.
+1. The Caretta agent runs on each node as a DaemonSet. It uses eBPF (small programs that run inside the Linux kernel) to record each TCP connection on the node. It then uses the Kubernetes API to turn each IP address into a workload name, such as a Deployment or a Service.
+2. [VictoriaMetrics](https://victoriametrics.com) collects the metrics from each agent and stores them.
+3. [Grafana](https://grafana.com) shows the map and other panels on a dashboard.
 
-Caretta demonstrates the power of using eBPF for observability solutions, which is our vision at [groundcover](https://groundcover.com). If you're interested in understanding how Caretta is built, head over to our [Caretta blog post!](https://www.groundcover.com/blog/caretta)
-
-## Installing Caretta :zap:
-
-As simple as installing a helm chart. It is recommended to install Caretta in a new, unique namespace.
-The chart is published as an OCI artifact on GHCR; see the [changelog](CHANGELOG.md) for newer versions than the one below.
-
-```bash
-helm install caretta oci://ghcr.io/tronyx/charts/caretta --version 0.2.0 --namespace caretta --create-namespace
-```
-
-To see a chart's details or values before installing:
-
-```bash
-helm show values oci://ghcr.io/tronyx/charts/caretta --version 0.2.0
-```
-
-### Configuration
-
-You can configure Caretta using helm values.
-Useful values:
-
-* **tolerations** can be specified to make sure Caretta's eBPF-agent will run on all cluster in your nodes. *default value will tolerate common control-plane node annotations*
-* **victoria-metrics-single.server.persistentVolume.enabled** can be set to *true* if you wish to save Caretta's metrics to a persistent volume *default: false*
-* **pollIntervalSeconds** can be modified to specify the polling and publishing interval of new metrics from the kernel. *default: 5*
-* The built-in Victoria Metrics and Grafana instances can be disabled by changing the values **victoria-metrics-single.enabled** or **grafana.enabled** to false, accordingly. *default: true*
-* Caretta resolves Kubernetes entities to their owners by default. For example, a pod 'pod1' and another pod 'pod2' both belonging to a deployment 'deployment1' will be resolved to 'deployment1'. This can be disabled by setting **traverseUpHierarchy** to false. *default: true*
-* **linkTTL** sets how long a link stays in the metrics after it was last seen, as a duration such as `30m` or `6h`, so links between workloads that are gone don't pile up. Set it to `0` to keep every link for as long as Caretta runs. *default: 1h*
-* **maxConnections** is how many connections Caretta can track on each node at once: those open, plus those closed since the last poll. The kernel reserves memory for all of them when Caretta starts, about 192 MiB at the default, scaling linearly, and it counts against Caretta's memory limit. When the table is full, new connections aren't tracked; `caretta_ebpf_connections_map_size` shows how full it is. Lowering it saves memory on every node. *default: 1000000*
-* **logFormat** chooses how Caretta writes its logs: `json`, one JSON object per line with a level and separate fields, for log collectors such as Fluent Bit or Promtail, or `text`, easier to read in `kubectl logs`. *default: json*
-* **resources** and **goMemLimit** set Caretta's CPU and memory. The memory limit has to cover the `maxConnections` memory above plus Caretta itself, and **goMemLimit** should stay below the limit minus that kernel memory, so Go frees memory before the pod runs out. If you change `maxConnections`, adjust them to match. *defaults: limit 512Mi, request 256Mi, goMemLimit 256MiB*
-* **networkPolicy.enabled** adds NetworkPolicies that only let the bundled VictoriaMetrics scrape Caretta and only the bundled Grafana query VictoriaMetrics, and limit both to DNS and the Kubernetes API server on the way out. Your cluster's network plugin has to enforce NetworkPolicy. To let something else in, such as your own Prometheus, add NetworkPolicy peers to **networkPolicy.metricsFrom** (Caretta) or **networkPolicy.queryFrom** (VictoriaMetrics). The API server rule allows any address on ports 443 and 6443; narrow **networkPolicy.apiServer.cidrs** to your API server's addresses. Grafana's own **grafana.networkPolicy** values control who can reach Grafana. *default: false*
-
-Example yaml for overriding these values:
-
-```yaml
-pollIntervalSeconds: 15  # set metrics polling interval
-traverseUpHierarchy: false  # disable resolving kubernetes entities to their owners
-
-tolerations:             # set any desired tolerations
-  - key: node-role.kubernetes.io/control-plane
-    operator: Exists
-    effect: NoSchedule
-
- victoria-metrics-single:
-  server:
-    persistentVolume:
-       enabled: true   # set to true to use persistent volume
-```
-
-This can also be done using the --set flag on the `helm install` command.
-
-### Uninstallation
-
-To uninstall, delete the helm release:
-
-```bash
-helm delete caretta --namespace caretta
-```
-
-Note that if persistent storage was enabled in the installation, it may not be deleted automatically by this command.
+Caretta does not change your workloads, and you do not have to add anything to them. [How it works](docs/how-it-works.md) has the details. groundcover also wrote a [blog post about Caretta](https://www.groundcover.com/blog/caretta).
 
 ## Requirements
 
-* Linux kernel version >= 5.8 with the default `securityContext` (uses the `BPF` and `PERFMON` capabilities). On kernels 4.16–5.7, replace those capabilities with `SYS_ADMIN` in **securityContext.capabilities.add**.
-* tracefs available on the host at `/sys/kernel/tracing` (override with **tracefsPath**, e.g. `/sys/kernel/debug/tracing`).
-* The namespace must allow privileged workloads under Pod Security Admission (`pod-security.kubernetes.io/enforce: privileged`).
-* [CO-RE](https://nakryiko.com/posts/bpf-portability-and-co-re/) support. Supported linux distributions are listed in [libbpf's README](https://github.com/libbpf/libbpf#bpf-co-re-compile-once--run-everywhere). Docker Desktop works too, for example with a kind cluster on a Mac: recent releases run a Linux kernel with BTF (tested with Linux 7.0).
+You need these to run Caretta:
 
-## Working with Caretta :turtle:
+- Kubernetes with Linux nodes on amd64 or arm64.
+- Linux kernel 5.8 or later on each node, with BTF type information. Most current distributions have it.
+- Helm 3.8 or later.
+- A namespace that allows privileged pods. The agent needs root and extra Linux capabilities to load its eBPF programs.
 
-Caretta's helm chart ships an instance of Grafana with a predefined dashboard using data published by Caretta. This dashboard contains some examples to demonstrate the usage of Caretta's metrics.
+[Installation](docs/installation.md#requirements) has the full list, and the steps for older kernels and OpenShift. Docker Desktop also works, for example with a [kind](https://kind.sigs.k8s.io) cluster on a Mac.
 
-### Example workloads
+## Install
 
-To give Caretta something to map, the `examples` folder has two apps, each with install and cleanup instructions at the top of its file:
+1. Create a namespace for Caretta:
 
-* [`demo-shop.yaml`](examples/demo-shop.yaml): a small app (a load generator, an nginx frontend and API, and Postgres), deployed with `kubectl apply`.
-* [`astronomy-shop-values.yaml`](examples/astronomy-shop-values.yaml): Helm values for the [OpenTelemetry Demo](https://opentelemetry.io/docs/demo/), a production-like shop of about 15 services in 10 languages, with gRPC, an Envoy edge proxy, Kafka, PostgreSQL, a Valkey cache, feature flags and a load generator. It's trimmed to fit on one node next to Caretta, and its feature flags can inject failures, such as a failing payment service, to watch the service map change.
+   ```bash
+   kubectl create namespace caretta
+   ```
 
-### Using the provided Grafana instance
+2. If your cluster enforces Pod Security Admission, allow privileged pods in the namespace:
 
-To access Grafana, port-forward its Service in Caretta's namespace, then open <http://localhost:3000>:
+   ```bash
+   kubectl label namespace caretta pod-security.kubernetes.io/enforce=privileged
+   ```
 
-```bash
-kubectl port-forward --namespace caretta svc/caretta-grafana 3000:80
+3. Install the chart:
+
+   ```bash
+   helm install caretta oci://ghcr.io/tronyx/charts/caretta --version 0.2.0 --namespace caretta
+   ```
+
+4. Make sure that all pods are ready. You see one `caretta` pod for each node, one `caretta-vm` pod and one `caretta-grafana` pod.
+
+   ```bash
+   kubectl get pods --namespace caretta
+   ```
+
+For a newer version, see the [releases](https://github.com/tronyx/caretta/releases). [Installation](docs/installation.md) also describes the images, Pod Security and how to remove Caretta.
+
+## Open the map in Grafana
+
+1. Forward the Grafana port to your computer:
+
+   ```bash
+   kubectl port-forward --namespace caretta svc/caretta-grafana 3000:80
+   ```
+
+2. Get the password for the `admin` user. The chart makes a random password when you install it and keeps it when you upgrade.
+
+   ```bash
+   kubectl get secret --namespace caretta caretta-grafana -o jsonpath='{.data.admin-password}' | base64 -d; echo
+   ```
+
+3. Open <http://localhost:3000> and log in as `admin`.
+
+The Caretta dashboard opens. It has a service map, the most active connections and workloads, and the ports in use. Connections appear on the map within a minute.
+
+To use your own password, or to let people see the dashboards without a login, see [Grafana](docs/configuration.md#grafana).
+
+## Configuration
+
+You set the configuration with Helm values, in a values file or with `--set`. This table shows the values that you are most likely to change. [Configuration](docs/configuration.md) describes all of them.
+
+| Value | Default | Description |
+| --- | --- | --- |
+| `pollIntervalSeconds` | `5` | How often the agent reads the connections from the kernel and updates its metrics, in seconds. |
+| `traverseUpHierarchy` | `true` | Show the top owner of each pod, for example its Deployment. If `false`, Caretta shows the pod name. |
+| `linkTTL` | `1h` | How long a link stays in the metrics after the agent last sees it. `0` keeps each link until the agent restarts. |
+| `maxConnections` | `1000000` | How many connections each agent can track at one time. It changes the memory that the agent needs. See [Memory](docs/configuration.md#memory). |
+| `networkPolicy.enabled` | `false` | Add NetworkPolicies that allow only the traffic that Caretta needs. See [Network policies](docs/configuration.md#network-policies). |
+| `victoria-metrics-single.server.persistentVolume.enabled` | `false` | Keep the metrics on a persistent volume. If `false`, the metrics are lost when VictoriaMetrics restarts. |
+
+This example values file keeps the metrics on a persistent volume and polls every 15 seconds:
+
+```yaml
+pollIntervalSeconds: 15
+victoria-metrics-single:
+  server:
+    persistentVolume:
+      enabled: true
 ```
 
-Log in as `admin`. The password is generated at install time and kept across upgrades; to read it:
+Install or upgrade with the file:
 
 ```bash
-kubectl get secret --namespace caretta caretta-grafana -o jsonpath='{.data.admin-password}' | base64 -d; echo
+helm upgrade --install caretta oci://ghcr.io/tronyx/charts/caretta --version 0.2.0 --namespace caretta -f values.yaml
 ```
 
-To use a password from your own Secret instead, set **grafana.admin.existingSecret** to its name (with the keys `admin-user` and `admin-password`). To let anyone who can reach Grafana view the dashboards without logging in, set **grafana.grafana\.ini.auth\.anonymous.enabled** to `true`.
+## Metrics
 
-> [!IMPORTANT]
-> Releases of Caretta before this fork used the fixed password `caretta` with anonymous access on. When you upgrade, use `helm upgrade --reset-then-reuse-values` (or pass your values again with `-f`): plain `--reuse-values` also keeps the old chart's defaults, password and anonymous access included. An upgrade also keeps whatever password is already in the `caretta-grafana` Secret; to get a new random one, delete that Secret, upgrade, then restart Grafana with `kubectl rollout restart --namespace caretta deployment/caretta-grafana`. If you enabled Grafana persistence, Grafana keeps the password stored in its database instead, so change it after logging in, under your profile.
+Each agent publishes its metrics in Prometheus format, on port 7117 at `/metrics`. The main metric is `caretta_links_observed`. It has one series for each link, which is the traffic from one workload to another workload on one port. Its labels name the client, the server and the port.
 
-### Scraping Caretta's metrics
+This query shows the ten busiest links in the cluster, in bytes per second:
 
-Caretta uses [Victoria Metrics](https://victoriametrics.com/) to collect and publish its metrics, and the outcome can be consumed by **any Prometheus-compatible dashboard**.
+```promql
+topk(10, sum by (client_name, server_name) (rate(caretta_links_observed{role="1"}[5m])))
+```
 
-Caretta's main metric is `caretta_links_observed` (Gauge). It uses the following labels to represent a specific connection (network socket) going through the cluster:
+[Metrics](docs/metrics.md) describes all the metrics and labels, has more example queries, and tells you how to use your own Prometheus.
 
-* `client_name` - either a name of a kubernetes entity, if resolved, an external domain, if resolved, or an IP address.
-* `client_namespace` - either the namespace of the kubernetes entity, or "node", or "external".
-* `client_kind` - either the kind of the kubernetes entity, or "node", or "external".
-* `server_name` - either a name of a kubernetes entity, if resolved, an external domain, if resolved, or an IP address.
-* `server_namespace` - either the namespace of the kubernetes entity, or "node", or "external".
-* `server_kind` - either the kind of the kubernetes entity, or "node", or "external".
-* `server_port` - the port used by the server.
-* `role` - either 1 (client) or 2 (server).
+## Upgrade
 
-Along those labels, Caretta uses other labels for Grafana's Node Graph panel.
-
-#### Example metric data
-
-This example shows a connection between a client named `checkoutservice`, controlled by a deployment, to a service named `productioncatalogservice` on port 3550, from the perspective of the client. Total bytes sent by the client in this connection is 2537 bytes.
+To upgrade to a new version, run this command with the new version:
 
 ```bash
-caretta_links_observed{client_id="1074587981",client_kind="Deployment",client_name="checkoutservice",client_namespace="demo-ng",link_id="198768460",role="1",server_id="1112713827",server_kind="Service",server_name="productcatalogservice",server_namespace="demo-ng",server_port="3550"} 2537
+helm upgrade caretta oci://ghcr.io/tronyx/charts/caretta --version 0.2.0 --namespace caretta --reset-then-reuse-values
 ```
 
-#### Example queries  :star:
+Do not use `--reuse-values`. [Upgrading](docs/upgrading.md) tells you why, and how to move from the groundcover chart.
+
+## Uninstall
 
 ```bash
-increase ((sum (server_port) (caretta_links_observed{client_name="some-client", server_name="some-server}))[15m])
+helm uninstall caretta --namespace caretta
+kubectl delete namespace caretta
 ```
 
-will output the throughput observed between some-client and some-server in the last 15 minutes, aggregated by port.
+## Documentation
 
-```bash
-sum by (server_name) (rate(caretta_links_observed{client_name="some-client"}))
-```
+| Page | Contents |
+| --- | --- |
+| [Installation](docs/installation.md) | The requirements, how to install and remove Caretta, the images, Pod Security, OpenShift and older kernels |
+| [Upgrading](docs/upgrading.md) | How to upgrade to a new version, how to move from the groundcover chart, and notes for each version |
+| [Configuration](docs/configuration.md) | All the values of the chart: the agent, memory, where the agent runs, security, network policies, VictoriaMetrics and Grafana |
+| [Metrics](docs/metrics.md) | The metrics and their labels, example queries, the health of Caretta, the probes, and how to use your own Prometheus |
+| [How it works](docs/how-it-works.md) | How Caretta records connections and gives them names, links that stop, and what Caretta cannot see |
+| [Troubleshooting](docs/troubleshooting.md) | Problems and their causes, and what each message in the log means |
+| [How it is tested](docs/testing.md) | The tests, how to run them, and the checks that GitHub runs on each change |
 
-will output the rate of traffic from some-client to servers it communicates with, aggregated by the server's name.
+The same pages are in the [wiki](https://github.com/tronyx/caretta/wiki), for the newest release.
 
-```bash
-sort_desc(increase((sum by (client_name)(caretta_links_observed{server_namespace="external"}))[5m]))
-```
+## Example apps
 
-will output communication to external servers by client's name, sorted descending.
+To see Caretta draw a map, run one of the example apps in the [examples](examples) folder. The top of each file tells you how to install and remove it.
 
-## Need help:grey_question:
+| Example | Description |
+| --- | --- |
+| [demo-shop.yaml](examples/demo-shop.yaml) | A small app: a load generator, an nginx frontend and API, and Postgres. Install it with `kubectl apply`. |
+| [astronomy-shop-values.yaml](examples/astronomy-shop-values.yaml) | Helm values for the [OpenTelemetry Demo](https://opentelemetry.io/docs/demo/), a shop with about 15 services in 10 languages. It uses gRPC, Envoy, Kafka, PostgreSQL, Valkey, feature flags and a load generator. The values make it fit on one node next to Caretta. |
 
-Feel free to reach us on our [slack channel](http://www.groundcover.com/join-slack), or create an issue in this repository.
+In the OpenTelemetry Demo, you can use the feature flags to make a service fail, and then see the change on the map.
 
-## Contribution
+## Get help
 
-Feel free to add your contribution to the project.
+- For problems with this fork, its images or its Helm chart, read [Troubleshooting](docs/troubleshooting.md), or [open an issue](https://github.com/tronyx/caretta/issues).
+- For questions about Caretta in general, ask in the [groundcover Slack](http://www.groundcover.com/join-slack).
 
-* Open an issue for missing features, or bugs
-* Create a pull request for adding code to the project
+## Contributing
 
-### Running the tests
+Pull requests are welcome. Open them against the `develop` branch. Add a line for your change to the `Unreleased` section of the [changelog](CHANGELOG.md). To change the documentation, edit the pages in [docs](docs). The wiki is a copy of them, and changes in the wiki are lost.
 
-CI runs all of these on every pull request.
+GitHub runs the tests on each pull request. [How it is tested](docs/testing.md) tells you how to run them yourself.
 
-* **Unit tests**, in the same Go and generated eBPF code as the image: `docker build --target test .`
-* **eBPF integration tests**, which load the real programs into your kernel and need root on Linux:
+## Credits and license
 
-  ```bash
-  docker build --target integration-test --output /tmp/integration .
-  sudo /tmp/integration/caretta-integration.test -test.v
-  ```
+[groundcover](https://www.groundcover.com) created Caretta and published it at [groundcover-com/caretta](https://github.com/groundcover-com/caretta). This fork is based on their work. The [changelog](CHANGELOG.md) lists the changes in this fork.
 
-* **Chart tests**: `docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD/chart:/apps" helmunittest/helm-unittest:4.3.0-1.2.1 .`
-* **End-to-end tests** on a kind cluster: build the image, load it with `kind load docker-image caretta:e2e`, then run `IMAGE_REPOSITORY=caretta IMAGE_TAG=e2e scripts/e2e.sh`. It installs the chart and the demo app on your current kubectl context.
+Caretta is licensed under the [Apache License 2.0](LICENSE).
