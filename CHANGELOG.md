@@ -6,7 +6,14 @@ Releases are tagged `vX.Y.Z`; each one publishes the images `ghcr.io/tronyx/care
 
 ## Unreleased
 
-Nothing yet.
+### Project
+
+- `examples/astronomy-shop-values.yaml` deploys the OpenTelemetry Demo (the "Astronomy Shop") with Helm: a production-like shop of about 15 services in 10 languages, with gRPC, an Envoy edge proxy, Kafka, PostgreSQL, a Valkey cache, feature flags and a load generator, trimmed to fit on one node next to Caretta. The README now lists both example apps.
+- The Markdown files pass markdownlint, with the rules in `.markdownlint.json`. The README's broken "made by groundcover" link is fixed.
+- CI lints the Markdown files on every pull request, so these problems can't come back.
+- The README no longer says Docker for Mac is unsupported: Caretta runs on Docker Desktop, whose recent releases have a Linux kernel with BTF, and it's tested there on a kind cluster.
+- Every container in both example apps has a CPU limit, so one runaway service can't starve the rest of the cluster. One did: after a restart, the Astronomy Shop's flagd leaked connections and climbed to about 14 CPUs. The Astronomy Shop also gets CPU requests close to what each service uses under load, since without them Kubernetes would reserve the full limits; the limits leave room for its Java and .NET services to start.
+- `scripts/build/download_libbpf_headers.sh` passes shellcheck, and a failed download of the libbpf headers now always stops the build with a clear message. Before, the failure only showed if `tar` happened to notice the broken download.
 
 ## [v0.2.0](https://github.com/tronyx/caretta/releases/tag/v0.2.0) · 2026-10-12
 
