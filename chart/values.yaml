@@ -205,9 +205,11 @@ grafana:
     default: "caretta-grafana-dashboards"
 
   grafana.ini:
+    # Set enabled to true to let anyone who can reach Grafana view dashboards without logging in.
     auth.anonymous:
-      enabled: true
+      enabled: false
     dashboards:
       default_home_dashboard_path: /var/lib/grafana/dashboards/default/dashboard.json
   adminUser: "admin"
-  adminPassword: "caretta"
+  # No adminPassword: a random one is generated into the caretta-grafana Secret and kept across upgrades.
+  # To use your own Secret instead, set admin.existingSecret.

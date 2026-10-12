@@ -90,16 +90,22 @@ Note that if persistent storage was enabled in the installation, it may not be d
 Caretta's helm chart ships an instance of Grafana with a predefined dashboard using data published by Caretta. This dashboard contains some examples to demonstrate the usage of Caretta's metrics.
 
 ### Using the provided Grafana instance
-To access Grafana, port-forward port `3000` from the Grafana pod in Caretta's namespace.
-
-Using *kubectl*, it should look something like this:
+To access Grafana, port-forward its Service in Caretta's namespace, then open http://localhost:3000:
 
 ```bash
-kubectl port-forward --namespace caretta <grafana-pod-name> 3000:3000
+kubectl port-forward --namespace caretta svc/caretta-grafana 3000:80
 ```
 
-> **_NOTE:_**  Anonymous mode is enabled, making the default dashboard accessible with no login needed.
->              To edit the default dashboard or create your own dashboard, use the default administrator's credentials user:`admin` ; password:`caretta`.
+Log in as `admin`. The password is generated at install time and kept across upgrades; to read it:
+
+```bash
+kubectl get secret --namespace caretta caretta-grafana -o jsonpath='{.data.admin-password}' | base64 -d; echo
+```
+
+To use a password from your own Secret instead, set **grafana.admin.existingSecret** to its name (with the keys `admin-user` and `admin-password`). To let anyone who can reach Grafana view the dashboards without logging in, set **grafana.grafana\.ini.auth\.anonymous.enabled** to `true`.
+
+> [!IMPORTANT]
+> Releases of Caretta before this fork used the fixed password `caretta` with anonymous access on. When you upgrade, use `helm upgrade --reset-then-reuse-values` (or pass your values again with `-f`): plain `--reuse-values` also keeps the old chart's defaults, password and anonymous access included. An upgrade also keeps whatever password is already in the `caretta-grafana` Secret; to get a new random one, delete that Secret, upgrade, then restart Grafana with `kubectl rollout restart --namespace caretta deployment/caretta-grafana`. If you enabled Grafana persistence, Grafana keeps the password stored in its database instead, so change it after logging in, under your profile.
 
 ### Scraping Caretta's metrics
 
