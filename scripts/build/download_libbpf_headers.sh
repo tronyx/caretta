@@ -4,6 +4,9 @@
 # The script is based on cilium's update headers script,
 # https://github.com/cilium/ebpf/blob/4420605496c54a45653a7f1d277896e71e6705e2/examples/headers/update.sh#L1
 
+# A failed download must fail the curl | tar pipeline below, not only a failed extraction.
+set -o pipefail
+
 # Version of libbpf to fetch headers from
 LIBBPF_VERSION=1.8.0
 
@@ -23,33 +26,28 @@ headers=(
 )
 
 if [ ! -d "pkg" ] ; then
-    echo "Run this scripts from the repository's root directory." 1>&2
+    echo "Run this script from the repository's root directory." 1>&2
     exit 1
 fi
 
-if [ ! -d "$HEADERS_DIRECTORY" ]; then
-    mkdir -p "$HEADERS_DIRECTORY"
-    if [ "$?" -ne 0 ]; then
-        echo "Failed to create libbpf headers directory \""$HEADERS_DIRECTORY"\"." 1>&2
-        exit 1
-    fi
+if ! mkdir -p "$HEADERS_DIRECTORY"; then
+    echo "Failed to create libbpf headers directory \"$HEADERS_DIRECTORY\"." 1>&2
+    exit 1
 fi
 
 # Fetch libbpf release and extract the desired headers
-curl -fsSL --connect-timeout 10 --max-time 30 \
+if ! curl -fsSL --connect-timeout 10 --max-time 30 \
     "https://github.com/libbpf/libbpf/archive/refs/tags/v${LIBBPF_VERSION}.tar.gz" | \
-    tar -xz --xform='s#.*/##' -C "$HEADERS_DIRECTORY" "${headers[@]}"
-if [ "$?" -ne 0 ]; then
+    tar -xz --xform='s#.*/##' -C "$HEADERS_DIRECTORY" "${headers[@]}"; then
     echo "Failed to download and extract the needed libbpf headers." 1>&2
     exit 1
 fi
 
 # Fetch compact vmlinux file from cilium's ebpf repository.
 # This is not a libbpf header per-se, but it's close enough that we put it in the same location.
-curl -fsS -o "$HEADERS_DIRECTORY"/vmlinux.h \
-    https://raw.githubusercontent.com/cilium/ebpf/v${CILIUM_VMLINUX_VERSION}/examples/headers/common.h
-if [ "$?" -ne 0 ]; then
-    echo "Failed to download vmlinux compact version from cilium's repository."
+if ! curl -fsS -o "$HEADERS_DIRECTORY"/vmlinux.h \
+    "https://raw.githubusercontent.com/cilium/ebpf/v${CILIUM_VMLINUX_VERSION}/examples/headers/common.h"; then
+    echo "Failed to download vmlinux compact version from cilium's repository." 1>&2
     exit 1
 fi
 
