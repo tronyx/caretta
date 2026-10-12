@@ -1,0 +1,111 @@
+{{- if .Values.networkPolicy.enabled }}
+{{- $apiServer := .Values.networkPolicy.apiServer }}
+{{- $vmEnabled := (index .Values "victoria-metrics-single").enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "caretta.name" . }}
+  labels:
+    {{- include "caretta.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app: caretta
+      {{- include "caretta.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  # An empty "from" would allow any source, so with no sources there's no rule at all
+  ingress:
+    {{- if or $vmEnabled .Values.networkPolicy.metricsFrom }}
+    - ports:
+        - protocol: TCP
+          port: {{ .Values.prometheusPort }}
+      from:
+        {{- if $vmEnabled }}
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: victoria-metrics-single
+              app.kubernetes.io/instance: {{ .Release.Name }}
+        {{- end }}
+        {{- with .Values.networkPolicy.metricsFrom }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    {{- end }}
+  egress:
+    # DNS, also used for reverse lookups of the IPs caretta sees
+    - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - ports:
+        {{- range $apiServer.ports }}
+        - protocol: TCP
+          port: {{ . }}
+        {{- end }}
+      to:
+        {{- range $apiServer.cidrs }}
+        - ipBlock:
+            cidr: {{ . }}
+        {{- end }}
+{{- if $vmEnabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "caretta.name" . }}-vm
+  labels:
+    {{- include "caretta.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: victoria-metrics-single
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    {{- if or .Values.grafana.enabled .Values.networkPolicy.queryFrom }}
+    - ports:
+        - protocol: TCP
+          port: 8428
+      from:
+        {{- if .Values.grafana.enabled }}
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: grafana
+              app.kubernetes.io/instance: {{ .Release.Name }}
+        {{- end }}
+        {{- with .Values.networkPolicy.queryFrom }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    {{- end }}
+  egress:
+    - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Scraping caretta
+    - ports:
+        - protocol: TCP
+          port: {{ .Values.prometheusPort }}
+      to:
+        - podSelector:
+            matchLabels:
+              app: caretta
+              {{- include "caretta.selectorLabels" . | nindent 14 }}
+    # Finding caretta's pods to scrape
+    - ports:
+        {{- range $apiServer.ports }}
+        - protocol: TCP
+          port: {{ . }}
+        {{- end }}
+      to:
+        {{- range $apiServer.cidrs }}
+        - ipBlock:
+            cidr: {{ . }}
+        {{- end }}
+{{- end }}
+{{- end }}

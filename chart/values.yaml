@@ -80,7 +80,26 @@ nodeSelector: {}
 affinity: {}
 priorityClassName:
 
+# Only allow the traffic caretta and VictoriaMetrics need. Requires a CNI that enforces NetworkPolicy.
+networkPolicy:
+  enabled: false
+  # Extra NetworkPolicy peers allowed to scrape caretta's metrics, e.g. your own Prometheus
+  metricsFrom: []
+  # Extra NetworkPolicy peers allowed to query VictoriaMetrics, besides the bundled Grafana
+  queryFrom: []
+  # The Kubernetes API server, which caretta and VictoriaMetrics watch. Both ports are listed because
+  # most CNIs check the endpoint (often 6443) behind the kubernetes Service (443). Narrow the CIDRs
+  # to your API server's addresses: kubectl get endpointslices -n default -l kubernetes.io/service-name=kubernetes
+  apiServer:
+    cidrs:
+      - 0.0.0.0/0
+      - ::/0
+    ports:
+      - 443
+      - 6443
+
 victoria-metrics-single:
+  enabled: true
   server:
     image:
       registry: docker.io
@@ -144,6 +163,7 @@ victoria-metrics-single:
                 target_label: caretta_node
 
 grafana:
+  enabled: true
   image:
     registry: docker.io
     repository: grafana/grafana
