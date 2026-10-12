@@ -50,3 +50,4 @@ Releases are tagged `vX.Y.Z`; each one publishes the images `ghcr.io/tronyx/care
 - eBPF code is generated with `go tool bpf2go` and libbpf 1.8.0 headers. The maps use BTF definitions, since libbpf 1.x no longer has the old `bpf_map_def`.
 - The workflow that mirrored Grafana and VictoriaMetrics images to groundcover's Quay is kept as `subcharts.yaml.OLD`, no longer run.
 - `examples/demo-shop.yaml` deploys a small app (a load generator, nginx frontend and API, and Postgres) that gives caretta a service map to show.
+- Dependabot opens pull requests against `develop` for new Go modules (Kubernetes ones grouped), the Go builder and distroless base images, the Grafana and VictoriaMetrics subcharts and the images they run, and the GitHub Actions, so the project doesn't fall years behind again.
