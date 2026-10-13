@@ -3,7 +3,7 @@
 You set the configuration of Caretta with Helm values, in a values file or with `--set`. This page describes the values of the chart and gives examples. To see all values with their defaults, run this command:
 
 ```bash
-helm show values oci://ghcr.io/tronyx/charts/caretta --version 0.2.0
+helm show values oci://ghcr.io/tronyx/charts/caretta --version 0.2.1
 ```
 
 To use a values file, add `-f values.yaml` to `helm install` or `helm upgrade`. For an upgrade, see also [Your values](upgrading.md#your-values).

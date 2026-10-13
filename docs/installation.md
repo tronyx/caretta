@@ -41,7 +41,7 @@ Docker Desktop also works, for example with a [kind](https://kind.sigs.k8s.io) c
 3. Install the chart:
 
    ```bash
-   helm install caretta oci://ghcr.io/tronyx/charts/caretta --version 0.2.0 --namespace caretta
+   helm install caretta oci://ghcr.io/tronyx/charts/caretta --version 0.2.1 --namespace caretta
    ```
 
 4. Make sure that all pods are ready:
@@ -55,7 +55,7 @@ Docker Desktop also works, for example with a [kind](https://kind.sigs.k8s.io) c
 For a newer version, see the [releases](https://github.com/tronyx/caretta/releases). To see all chart values before you install, run this command:
 
 ```bash
-helm show values oci://ghcr.io/tronyx/charts/caretta --version 0.2.0
+helm show values oci://ghcr.io/tronyx/charts/caretta --version 0.2.1
 ```
 
 To install with your own values, write them to a file and add `-f values.yaml` to the `helm install` command. [Configuration](configuration.md) describes the values.
@@ -69,7 +69,7 @@ The chart installs the image from the GitHub Container Registry. The same image 
 | GitHub Container Registry | `ghcr.io/tronyx/caretta` |
 | Docker Hub | `docker.io/tronyx/caretta` |
 
-To use the Docker Hub image, set `image.repository` to `docker.io/tronyx/caretta`. Each release tag, for example `v0.2.0`, is on both registries. No image has the `latest` tag.
+To use the Docker Hub image, set `image.repository` to `docker.io/tronyx/caretta`. Each release tag, for example `v0.2.1`, is on both registries. No image has the `latest` tag.
 
 Before a release is published, a scanner looks for known vulnerabilities in the image. If the image has a critical vulnerability that has a fix, the release stops. Each week, the scanner also scans the newest release again.
 
@@ -77,11 +77,11 @@ Before a release is published, a scanner looks for known vulnerabilities in the 
 
 Each release after v0.2.0 is signed with [cosign](https://docs.sigstore.dev/cosign/). The signature proves that the release workflow of this repository built the image or the chart from the tag of the release. No one keeps a signing key. The signature uses the identity that GitHub gives to the workflow.
 
-To check an image, install cosign, and then run this command. Replace `v0.3.0` with your version in both places:
+To check an image, install cosign, and then run this command. Replace `v0.2.1` with your version in both places:
 
 ```bash
-cosign verify ghcr.io/tronyx/caretta:v0.3.0 \
-  --certificate-identity https://github.com/tronyx/caretta/.github/workflows/release.yaml@refs/tags/v0.3.0 \
+cosign verify ghcr.io/tronyx/caretta:v0.2.1 \
+  --certificate-identity https://github.com/tronyx/caretta/.github/workflows/release.yaml@refs/tags/v0.2.1 \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
@@ -90,8 +90,8 @@ If the signature is correct, cosign shows its details. If not, cosign shows an e
 To check the chart, write the version of the chart without the `v` in the first line:
 
 ```bash
-cosign verify ghcr.io/tronyx/charts/caretta:0.3.0 \
-  --certificate-identity https://github.com/tronyx/caretta/.github/workflows/release.yaml@refs/tags/v0.3.0 \
+cosign verify ghcr.io/tronyx/charts/caretta:0.2.1 \
+  --certificate-identity https://github.com/tronyx/caretta/.github/workflows/release.yaml@refs/tags/v0.2.1 \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
@@ -102,8 +102,8 @@ The `develop-` images are signed in the same way, by the workflow `pr.yaml` on t
 Each image also has an SBOM (software bill of materials), which lists the packages in the image. It also has a provenance record, which tells how the image was built. The signature of the image covers both. To see them, run these commands:
 
 ```bash
-docker buildx imagetools inspect ghcr.io/tronyx/caretta:v0.3.0 --format '{{ json .SBOM }}'
-docker buildx imagetools inspect ghcr.io/tronyx/caretta:v0.3.0 --format '{{ json .Provenance }}'
+docker buildx imagetools inspect ghcr.io/tronyx/caretta:v0.2.1 --format '{{ json .SBOM }}'
+docker buildx imagetools inspect ghcr.io/tronyx/caretta:v0.2.1 --format '{{ json .Provenance }}'
 ```
 
 ## Pod Security

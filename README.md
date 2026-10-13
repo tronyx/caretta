@@ -60,7 +60,7 @@ You need these to run Caretta:
 3. Install the chart:
 
    ```bash
-   helm install caretta oci://ghcr.io/tronyx/charts/caretta --version 0.2.0 --namespace caretta
+   helm install caretta oci://ghcr.io/tronyx/charts/caretta --version 0.2.1 --namespace caretta
    ```
 
 4. Make sure that all pods are ready. You see one `caretta` pod for each node, one `caretta-vm` pod and one `caretta-grafana` pod.
@@ -117,7 +117,7 @@ victoria-metrics-single:
 Install or upgrade with the file:
 
 ```bash
-helm upgrade --install caretta oci://ghcr.io/tronyx/charts/caretta --version 0.2.0 --namespace caretta -f values.yaml
+helm upgrade --install caretta oci://ghcr.io/tronyx/charts/caretta --version 0.2.1 --namespace caretta -f values.yaml
 ```
 
 ## Metrics
@@ -137,7 +137,7 @@ topk(10, sum by (client_name, server_name) (rate(caretta_links_observed{role="1"
 To upgrade to a new version, run this command with the new version:
 
 ```bash
-helm upgrade caretta oci://ghcr.io/tronyx/charts/caretta --version 0.2.0 --namespace caretta --reset-then-reuse-values
+helm upgrade caretta oci://ghcr.io/tronyx/charts/caretta --version 0.2.1 --namespace caretta --reset-then-reuse-values
 ```
 
 Do not use `--reuse-values`. [Upgrading](docs/upgrading.md) tells you why, and how to move from the groundcover chart.

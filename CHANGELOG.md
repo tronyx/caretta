@@ -6,6 +6,12 @@ Releases are tagged `vX.Y.Z`; each one publishes the images `ghcr.io/tronyx/care
 
 ## Unreleased
 
+Nothing yet.
+
+## [v0.2.1](https://github.com/tronyx/caretta/releases/tag/v0.2.1) · 2026-10-13
+
+Caretta and its chart work exactly as in v0.2.0. This is the first release that is signed, with an SBOM and a provenance record for each image. It also adds the documentation pages and the wiki, tests on each long-term kernel from 5.4, and tested steps to upgrade in place from groundcover's chart.
+
 ### Project
 
 - `examples/astronomy-shop-values.yaml` deploys the OpenTelemetry Demo (the "Astronomy Shop") with Helm: a production-like shop of about 15 services in 10 languages, with gRPC, an Envoy edge proxy, Kafka, PostgreSQL, a Valkey cache, feature flags and a load generator, trimmed to fit on one node next to Caretta. The README now lists both example apps.
