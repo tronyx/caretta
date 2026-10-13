@@ -25,7 +25,43 @@ Use `--reset-then-reuse-values`, or give your values file again with `-f values.
 
 ## Move from the groundcover chart
 
-The groundcover chart is at [groundcover-com/caretta](https://github.com/groundcover-com/caretta). Its last release was v0.0.17. To move to this fork, remove the groundcover chart and install this one:
+The groundcover chart is at [groundcover-com/caretta](https://github.com/groundcover-com/caretta). Its last chart version is 0.0.16. You can upgrade it in place, or remove it and install this chart.
+
+In both cases, the metrics that VictoriaMetrics stored are lost, unless you enabled its persistent volume.
+
+### Upgrade in place
+
+1. Save the values of your release to a file:
+
+   ```bash
+   helm get values caretta --namespace caretta -o yaml > values.yaml
+   ```
+
+2. Remove these values from the file, if it has them:
+   - `image.repository` and `image.tag`, and each `image` value under `grafana` and `victoria-metrics-single`. They point at the images of groundcover.
+   - `rbac.pspEnabled`, `grafana.rbac.pspEnabled` and `victoria-metrics-single.rbac.pspEnabled`. Kubernetes 1.25 removed Pod Security Policies, and this chart does not have them.
+
+   If the file contains only `null`, you did not set values. Keep the file as it is.
+
+3. Upgrade with the file:
+
+   ```bash
+   helm upgrade caretta oci://ghcr.io/tronyx/charts/caretta --version 0.2.0 --namespace caretta --reset-values -f values.yaml
+   ```
+
+4. Make sure that all pods are ready:
+
+   ```bash
+   kubectl get pods --namespace caretta
+   ```
+
+5. Change the Grafana password, as in [The Grafana password](#the-grafana-password).
+
+For this upgrade, use `--reset-values` with your file, not `--reset-then-reuse-values`. With `--reset-then-reuse-values`, Helm keeps the old values that you removed from the file. For example, if you set `image.tag` for the groundcover chart, the agent then tries to get `ghcr.io/tronyx/caretta:v0.0.16`. That image does not exist, and the upgrade fails. To recover, do steps 2 and 3 again.
+
+This upgrade is tested from chart 0.0.16 with its default values and with a pinned image tag, on Kubernetes 1.37. The names, labels and selectors of the workloads are the same in both charts, so Kubernetes accepts the upgrade.
+
+### Remove and install again
 
 1. Remove the groundcover chart:
 
@@ -33,16 +69,10 @@ The groundcover chart is at [groundcover-com/caretta](https://github.com/groundc
    helm uninstall caretta --namespace caretta
    ```
 
-2. In your values file, remove the image repositories and tags that point at groundcover images. Also remove the values for the Pod Security Policy. Kubernetes 1.25 removed Pod Security Policies, and this chart does not have one.
+2. In your values file, remove the values in step 2 of [Upgrade in place](#upgrade-in-place).
 3. Install this chart, as in [Install](installation.md#install).
 
-The metrics that VictoriaMetrics stored are lost, unless you enabled its persistent volume. The new installation makes a new random Grafana password.
-
-### Upgrade in place
-
-This fork does not test an upgrade in place from the groundcover chart. The VictoriaMetrics chart changed a lot since then, and Kubernetes does not let Helm change some of its fields. If `helm upgrade` stops with an error that a field is immutable, use the steps in [Move from the groundcover chart](#move-from-the-groundcover-chart).
-
-If the upgrade in place works, read the next section.
+The new installation makes a new random Grafana password.
 
 ### The Grafana password
 
