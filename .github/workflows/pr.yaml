@@ -84,6 +84,56 @@ jobs:
         name: Run the integration tests as root
         run: sudo "$RUNNER_TEMP/integration/caretta-integration.test" -test.v -test.count=1
 
+  kernels:
+    name: eBPF on Linux ${{ matrix.kernel }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Each long-term kernel from 5.4, the first with BTF, and the newest stable one.
+        # Kernel images: https://github.com/cilium/ci-kernels. Old ones can be removed from there; then drop them here.
+        kernel: ["5.4", "5.10", "5.15", "6.1", "6.6", "6.12", "6.18", stable]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v7
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+      -
+        name: Build the integration tests
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: integration-test
+          platforms: linux/amd64
+          outputs: type=local,dest=${{ runner.temp }}/integration
+          cache-from: type=gha
+      -
+        name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      -
+        # vimto runs a command in a VM with another kernel. It must be static, since the VM uses it as init.
+        name: Install vimto and QEMU
+        run: |
+          CGO_ENABLED=0 go install lmb.io/vimto@v0.4.0
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends qemu-system-x86
+          sudo chmod 0666 /dev/kvm
+      -
+        # The VM settings are in .vimto.toml. vimto hands its stdin to the VM's console, so it gets /dev/null.
+        # SIGQUIT makes a hung vimto print its goroutines before it stops.
+        name: Run the integration tests in the VM
+        run: |
+          timeout -s QUIT -k 30s 3m vimto -kernel ":${{ matrix.kernel }}" exec -- /bin/sh -c 'uname -srm && ls -l /sys/kernel/btf/vmlinux' < /dev/null
+          timeout -s QUIT -k 30s 5m vimto -kernel ":${{ matrix.kernel }}" exec -- "$RUNNER_TEMP/integration/caretta-integration.test" -test.v -test.count=1 < /dev/null
+
   e2e:
     name: End-to-end on kind
     needs: [test, ebpf]
@@ -123,10 +173,11 @@ jobs:
         run: scripts/e2e.sh
 
   build:
-    needs: [test, ebpf, e2e]
+    needs: [test, ebpf, kernels, e2e]
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      id-token: write
       packages: write
       security-events: write
     env:
@@ -190,7 +241,13 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       -
+        # No floating major tag exists; Dependabot updates the commit and the version comment
+        name: Install cosign
+        if: env.PUBLISH == 'true'
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      -
         name: Build Docker Image
+        id: build
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -201,4 +258,13 @@ jobs:
             ghcr.io/tronyx/caretta:${{ steps.tag.outputs.tag }}
             docker.io/tronyx/caretta:${{ steps.tag.outputs.tag }}
           platforms: linux/amd64,linux/arm64
+          provenance: mode=max
+          sbom: true
+      -
+        # Keyless, like release.yaml
+        name: Sign the images
+        if: env.PUBLISH == 'true'
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: cosign sign --yes "ghcr.io/tronyx/caretta@${DIGEST}" "docker.io/tronyx/caretta@${DIGEST}"
 

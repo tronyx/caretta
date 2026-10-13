@@ -6,6 +6,12 @@ Releases are tagged `vX.Y.Z`; each one publishes the images `ghcr.io/tronyx/care
 
 ## Unreleased
 
+Nothing yet.
+
+## [v0.2.1](https://github.com/tronyx/caretta/releases/tag/v0.2.1) · 2026-10-13
+
+Caretta and its chart work exactly as in v0.2.0. This is the first release that is signed, with an SBOM and a provenance record for each image. It also adds the documentation pages and the wiki, tests on each long-term kernel from 5.4, and tested steps to upgrade in place from groundcover's chart.
+
 ### Project
 
 - `examples/astronomy-shop-values.yaml` deploys the OpenTelemetry Demo (the "Astronomy Shop") with Helm: a production-like shop of about 15 services in 10 languages, with gRPC, an Envoy edge proxy, Kafka, PostgreSQL, a Valkey cache, feature flags and a load generator, trimmed to fit on one node next to Caretta. The README now lists both example apps.
@@ -17,6 +23,10 @@ Releases are tagged `vX.Y.Z`; each one publishes the images `ghcr.io/tronyx/care
 - The README is rewritten in plain English, in the order a new user needs it: what Caretta does, requirements, installing, opening Grafana, configuration, metrics, upgrading and the example apps. It adds steps for clusters that enforce Pod Security Admission, using your own Prometheus, Caretta's own health metrics and the upgrade from groundcover's chart. Its example queries now work. The three in the old README didn't parse.
 - The documentation is split into pages in `docs/`: Installation, Upgrading, Configuration, Metrics, How it works, Troubleshooting and How it is tested. They add what the README didn't have room for: every chart value, every metric and label, the capabilities the agent needs and why, what each startup error and log message means, and what Caretta can't see. The README is shorter and links to each page.
 - The pages in `docs/` are copied to the [GitHub Wiki](https://github.com/tronyx/caretta/wiki) each time they change on `main`, so the wiki always matches the latest release. Edit the pages in `docs/`, since changes made in the wiki are overwritten.
+- CI also runs the eBPF tests on other kernels, each in a VM made by [vimto](https://github.com/lmb/vimto): every long-term kernel from 5.4 to 6.18, and the newest stable kernel. Before, they only ran on the kernels of GitHub's runners, which are all 6.x. All of them pass.
+- The docs no longer say that Caretta runs on kernels 4.16 to 5.7. The new tests showed that kernels before 5.4 usually have no BTF, and Caretta can't load without it. Kernels 5.4 to 5.7 work, with `SYS_ADMIN` instead of the default capabilities.
+- Releases are signed with cosign, without a key: the signature proves that this repository's release workflow built the image or chart from the release's tag. Each image also carries an SBOM and a provenance record, which the signature covers. The `develop-` images are signed the same way. The Installation page shows how to check them.
+- The upgrade in place from groundcover's last chart, 0.0.16, is now tested, and the Upgrading page has the steps. It works with `--reset-values` and your values file, without groundcover's image and Pod Security Policy values. With `--reset-then-reuse-values`, a pinned groundcover image tag stays, and the upgrade fails.
 
 ## [v0.2.0](https://github.com/tronyx/caretta/releases/tag/v0.2.0) · 2026-10-12
 

@@ -7,7 +7,7 @@ This page describes the tests of Caretta, and the checks that GitHub runs on eac
 | Tests | What they check |
 | --- | --- |
 | Unit tests | The Go code: the poll, the links, the expiry of links, the metrics, the names for addresses, the health probes, the configuration and the order of the steps at shutdown. They run with the Go race detector. |
-| eBPF tests | The real eBPF programs in a real kernel. The tests load the programs, make real TCP connections, and make sure that the kernel records each connection with the correct role, ports, process and counts of bytes. They also make sure that a poll turns the connections into links and removes the closed connections from the kernel. |
+| eBPF tests | The real eBPF programs in a real kernel. The tests load the programs, make real TCP connections, and make sure that the kernel records each connection with the correct role, ports, process and counts of bytes. They also make sure that a poll turns the connections into links and removes the closed connections from the kernel. They run on the kernel of your computer, or in a VM with another kernel. |
 | Chart tests | The Helm chart: the security context, the configuration of the agent, the probes, RBAC, the service account, each case of the NetworkPolicies, the image versions and the Grafana login. |
 | End-to-end tests | The full installation on a kind cluster. See [The end-to-end tests](#the-end-to-end-tests). |
 
@@ -47,6 +47,26 @@ docker exec caretta-test-control-plane /root/caretta-integration.test -test.v
 ```
 
 Copy the file to `/root`, not to `/tmp`. The node of a kind cluster mounts an empty `/tmp`.
+
+### eBPF tests on other kernels
+
+[vimto](https://github.com/lmb/vimto) runs the eBPF tests in a small VM (virtual machine) with another kernel. The kernels come from [cilium/ci-kernels](https://github.com/cilium/ci-kernels). The settings of the VM are in [.vimto.toml](../.vimto.toml). You need Linux with Go and QEMU. You do not need root.
+
+1. Install vimto:
+
+   ```bash
+   CGO_ENABLED=0 go install lmb.io/vimto@v0.4.0
+   ```
+
+2. Build the tests, as in step 1 of [eBPF tests](#ebpf-tests).
+
+3. In the root folder of the repository, run the tests on a kernel, for example 5.10:
+
+   ```bash
+   vimto -kernel :5.10 exec -- /tmp/integration/caretta-integration.test -test.v
+   ```
+
+vimto uses KVM to make the VM fast. If your computer does not have KVM, set `VIMTO_DISABLE_KVM=true`. The tests then take longer.
 
 ### Chart tests
 
@@ -97,8 +117,9 @@ GitHub runs these checks on each pull request and on each push to `develop`:
 | --- | --- |
 | Test and lint | The unit tests, `helm lint`, the chart tests and markdownlint for the Markdown files. |
 | eBPF on the amd64 kernel and eBPF on the arm64 kernel | The eBPF tests, as root, on the kernels of an amd64 and an arm64 runner. |
+| eBPF on Linux, with a kernel version | The eBPF tests in a VM, on each long-term kernel from 5.4, and on the newest stable kernel. See [eBPF tests on other kernels](#ebpf-tests-on-other-kernels). |
 | End-to-end on kind | The end-to-end tests on a new kind cluster, with the image from the same run. |
-| build | Builds the image, and scans it for known vulnerabilities. On `develop`, it also publishes the image with the tag `develop-` and the first 7 characters of the commit. |
+| build | Builds the image, and scans it for known vulnerabilities. On `develop`, it also publishes and signs the image with the tag `develop-` and the first 7 characters of the commit. |
 
 The build starts only after the tests pass. If the image has a critical vulnerability that has a fix, the build fails and does not publish the image.
 
@@ -106,7 +127,7 @@ The build starts only after the tests pass. If the image has a critical vulnerab
 
 | Workflow | When | What it does |
 | --- | --- | --- |
-| release | For each version tag | Scans and publishes the image and the chart, and makes the GitHub release from the changelog. |
+| release | For each version tag | Scans, publishes and signs the image and the chart, and makes the GitHub release from the changelog. |
 | scan | Each week | Scans the images of the newest release again, for vulnerabilities that were found after the release. |
 | Sync the wiki | For each change to `docs/` on `main` | Copies the `docs/` folder to the wiki of the repository. |
 
