@@ -6,7 +6,9 @@ Releases are tagged `vX.Y.Z`; each one publishes the images `ghcr.io/tronyx/care
 
 ## Unreleased
 
-Nothing yet.
+### Project
+
+- The agent reads each setting from its environment variable with one shared function, instead of seven copies of the same checks. The settings, their defaults and the handling of invalid values are unchanged.
 
 ## [v0.2.1](https://github.com/tronyx/caretta/releases/tag/v0.2.1) · 2026-10-13
 
