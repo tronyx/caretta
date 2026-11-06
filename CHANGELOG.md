@@ -6,6 +6,14 @@ Releases are tagged `vX.Y.Z`; each one publishes the images `ghcr.io/tronyx/care
 
 ## Unreleased
 
+Nothing yet.
+
+## [v0.2.2](https://github.com/tronyx/caretta/releases/tag/v0.2.2) · 2026-11-06
+
+A security update. The image fixes four known vulnerabilities in v0.2.1, one of them rated high, and VictoriaMetrics, Grafana and their charts are updated.
+
+**Upgrading:** Grafana's chart now checks the types of its values. If you set Grafana values, make sure that numbers and booleans aren't quoted before you upgrade. The Upgrading page has the details.
+
 ### Changed
 
 - The image is rebuilt with fixes for four known vulnerabilities that a scan of v0.2.1 finds. Go 1.27.3 fixes CVE-2026-111943 in Go's standard library, which is rated high. `golang.org/x/net` v0.62.0 fixes CVE-2026-78661 and CVE-2026-97045. Caretta doesn't call the affected `x/net` code, but scanners flag it. The newest distroless base image has the fixed `ca-certificates` from DSA-6572-1. The Kubernetes client libraries are also updated to v0.37.2.
