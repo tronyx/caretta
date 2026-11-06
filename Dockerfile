@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM --platform=$BUILDPLATFORM golang:1.27.2-trixie AS ebpf-builder
+FROM --platform=$BUILDPLATFORM golang:1.27.3-trixie AS ebpf-builder
 RUN apt-get update \
  && apt-get install -y --no-install-recommends clang llvm \
  && rm -rf /var/lib/apt/lists/*
@@ -34,6 +34,6 @@ FROM scratch AS integration-test
 COPY --from=integration-test-build /caretta-integration.test /
 
 # gcr.io/distroless/static-debian13 (root variant: attaching kprobes requires uid 0)
-FROM gcr.io/distroless/static-debian13@sha256:58133991db06659feaabe0f4e97a35cebf15ef4ea08f8a4c6d2ee5f75e4aa6a0
+FROM gcr.io/distroless/static-debian13@sha256:448810357cc8e67b7208988abdba0f5ec3d3aebee0a5b13eb624979792cffc0f
 COPY --from=builder /src/bin/caretta /caretta
 ENTRYPOINT ["/caretta"]

@@ -6,6 +6,10 @@ Releases are tagged `vX.Y.Z`; each one publishes the images `ghcr.io/tronyx/care
 
 ## Unreleased
 
+### Changed
+
+- `golang.org/x/net` is updated from v0.60.0 to v0.62.0, which fixes GO-2026-6866 and GO-2026-6860. Caretta doesn't call the affected code, but scanners flag the old version. The Kubernetes client libraries are updated to v0.37.2, the Go builder to 1.27.3, and the distroless base image to Google's newest rebuild.
+
 ### Project
 
 - The agent reads each setting from its environment variable with one shared function, instead of seven copies of the same checks. The settings, their defaults and the handling of invalid values are unchanged.
