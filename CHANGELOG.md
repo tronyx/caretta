@@ -8,6 +8,23 @@ Releases are tagged `vX.Y.Z`; each one publishes the images `ghcr.io/tronyx/care
 
 Nothing yet.
 
+## [v0.2.2](https://github.com/tronyx/caretta/releases/tag/v0.2.2) · 2026-11-06
+
+A security update. The image fixes four known vulnerabilities in v0.2.1, one of them rated high, and VictoriaMetrics, Grafana and their charts are updated.
+
+**Upgrading:** Grafana's chart now checks the types of its values. If you set Grafana values, make sure that numbers and booleans aren't quoted before you upgrade. The Upgrading page has the details.
+
+### Changed
+
+- The image is rebuilt with fixes for four known vulnerabilities that a scan of v0.2.1 finds. Go 1.27.3 fixes CVE-2026-111943 in Go's standard library, which is rated high. `golang.org/x/net` v0.62.0 fixes CVE-2026-78661 and CVE-2026-97045. Caretta doesn't call the affected `x/net` code, but scanners flag it. The newest distroless base image has the fixed `ca-certificates` from DSA-6572-1. The Kubernetes client libraries are also updated to v0.37.2.
+- The VictoriaMetrics subchart is updated from 0.48.0 to 0.50.0, with VictoriaMetrics v1.155.0. Its resources keep their names, so an upgrade only restarts VictoriaMetrics. Grafana is updated to 13.3.0, and the images of Grafana's optional parts (curl, the image renderer and the k8s-sidecar) to their newest patch releases.
+- The Grafana subchart is updated from 13.4.0 to 14.4.0. It now checks the types of its values, and stops `helm install` and `helm upgrade` if one is wrong. If you set Grafana values, make sure that numbers and booleans aren't quoted, for example `grafana.persistence.enabled: true` and not `"true"`, and that a numeric `grafana.image.tag` is quoted. With the chart's defaults, nothing changes, and the Grafana password is kept.
+
+### Project
+
+- CI uses Trivy 0.76.2, markdownlint-cli2 0.24.0 through its action v25.0.0, kind-action v1.15.2 and cosign-installer v4.1.3. Dependabot is now turned on for this repository. It was off since the fork, so none of the updates in `dependabot.yml` had run.
+- The agent reads each setting from its environment variable with one shared function, instead of seven copies of the same checks. The settings, their defaults and the handling of invalid values are unchanged.
+
 ## [v0.2.1](https://github.com/tronyx/caretta/releases/tag/v0.2.1) · 2026-10-13
 
 Caretta and its chart work exactly as in v0.2.0. This is the first release that is signed, with an SBOM and a provenance record for each image. It also adds the documentation pages and the wiki, tests on each long-term kernel from 5.4, and tested steps to upgrade in place from groundcover's chart.

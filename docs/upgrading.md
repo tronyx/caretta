@@ -8,7 +8,7 @@ This page tells you how to upgrade Caretta, and how to move from the groundcover
 2. Upgrade the chart:
 
    ```bash
-   helm upgrade caretta oci://ghcr.io/tronyx/charts/caretta --version 0.2.1 --namespace caretta --reset-then-reuse-values
+   helm upgrade caretta oci://ghcr.io/tronyx/charts/caretta --version 0.2.2 --namespace caretta --reset-then-reuse-values
    ```
 
 3. Make sure that all pods are ready:
@@ -17,7 +17,7 @@ This page tells you how to upgrade Caretta, and how to move from the groundcover
    kubectl get pods --namespace caretta
    ```
 
-Replace `0.2.1` with the new version. The agents restart one node at a time, and each agent starts again from zero. Because the metrics are counters, `rate()` and `increase()` treat this as a counter reset, and the dashboard is not affected.
+Replace `0.2.2` with the new version. The agents restart one node at a time, and each agent starts again from zero. Because the metrics are counters, `rate()` and `increase()` treat this as a counter reset, and the dashboard is not affected.
 
 ### Your values
 
@@ -46,7 +46,7 @@ In both cases, the metrics that VictoriaMetrics stored are lost, unless you enab
 3. Upgrade with the file:
 
    ```bash
-   helm upgrade caretta oci://ghcr.io/tronyx/charts/caretta --version 0.2.1 --namespace caretta --reset-values -f values.yaml
+   helm upgrade caretta oci://ghcr.io/tronyx/charts/caretta --version 0.2.2 --namespace caretta --reset-values -f values.yaml
    ```
 
 4. Make sure that all pods are ready:
@@ -99,6 +99,15 @@ The groundcover chart used the fixed Grafana password `caretta`, and let anyone 
 If you enabled persistence for Grafana, Grafana keeps the password in its database, and these steps do not change it. In that case, log in and change the password in your Grafana profile.
 
 ## Version notes
+
+### 0.2.2
+
+The Grafana chart now checks the types of the values under `grafana`. If a value has the wrong type, `helm upgrade` stops with an error such as `at '/persistence/enabled': got string, want boolean`. Before you upgrade, check the Grafana values in your values file:
+
+- Do not quote numbers and booleans. Write `grafana.persistence.enabled: true`, not `"true"`. With `--set`, do not use `--set-string` for them.
+- Quote an image tag that is a number. Write `grafana.image.tag: "13.3"`, not `13.3`.
+
+If you do not set Grafana values, you do not have to do anything. The upgrade keeps the Grafana password.
 
 ### 0.2.0
 

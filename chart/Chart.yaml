@@ -1,15 +1,15 @@
-version: 0.2.1
+version: 0.2.2
 apiVersion: v2
-appVersion: v0.2.1
+appVersion: v0.2.2
 name: caretta
 description: A helm chart for Caretta service map.
 type: application
 dependencies:
 - name: victoria-metrics-single
-  version: "0.48.0"
+  version: "0.50.0"
   repository: "https://victoriametrics.github.io/helm-charts"
   condition: victoria-metrics-single.enabled
 - name: grafana
-  version: "13.4.0"
+  version: "14.4.0"
   repository: "https://grafana-community.github.io/helm-charts"
   condition: grafana.enabled

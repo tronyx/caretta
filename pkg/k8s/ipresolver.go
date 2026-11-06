@@ -228,7 +228,6 @@ func (resolver *K8sIPResolver) onServiceUpsert(obj any) {
 		return
 	}
 	watchEventsCounter.WithLabelValues("service").Inc()
-	// TODO maybe try to match service to workload
 	workload := Workload{
 		Name:      service.Name,
 		Namespace: service.Namespace,
