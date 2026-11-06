@@ -103,7 +103,7 @@ victoria-metrics-single:
     image:
       registry: docker.io
       repository: victoriametrics/victoria-metrics
-      tag: v1.153.0
+      tag: v1.155.0
     resources:
       limits:
         cpu: 300m
@@ -166,7 +166,7 @@ grafana:
   image:
     registry: docker.io
     repository: grafana/grafana
-    tag: 13.2.3-distroless
+    tag: 13.3.0-distroless
   testFramework:
     image:
       registry: docker.io
@@ -180,12 +180,12 @@ grafana:
   downloadDashboardsImage:
     registry: docker.io
     repository: curlimages/curl
-    tag: 8.22.0
+    tag: 8.23.0
   imageRenderer:
     image:
       registry: docker.io
       repository: grafana/grafana-image-renderer
-      tag: v5.12.5
+      tag: v5.12.10
   resources:
     limits:
       memory: 512Mi
@@ -207,7 +207,7 @@ grafana:
     image:
       registry: quay.io
       repository: kiwigrid/k8s-sidecar
-      tag: 2.14.1
+      tag: 2.14.3
     dashboards:
       label: grafana_dashboard
       labelValue: ""

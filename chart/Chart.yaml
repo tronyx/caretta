@@ -6,7 +6,7 @@ description: A helm chart for Caretta service map.
 type: application
 dependencies:
 - name: victoria-metrics-single
-  version: "0.48.0"
+  version: "0.50.0"
   repository: "https://victoriametrics.github.io/helm-charts"
   condition: victoria-metrics-single.enabled
 - name: grafana

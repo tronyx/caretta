@@ -9,6 +9,7 @@ Releases are tagged `vX.Y.Z`; each one publishes the images `ghcr.io/tronyx/care
 ### Changed
 
 - `golang.org/x/net` is updated from v0.60.0 to v0.62.0, which fixes GO-2026-6866 and GO-2026-6860. Caretta doesn't call the affected code, but scanners flag the old version. The Kubernetes client libraries are updated to v0.37.2, the Go builder to 1.27.3, and the distroless base image to Google's newest rebuild.
+- The VictoriaMetrics subchart is updated from 0.48.0 to 0.50.0, with VictoriaMetrics v1.155.0. Its resources keep their names, so an upgrade only restarts VictoriaMetrics. Grafana is updated to 13.3.0, and the images of Grafana's optional parts (curl, the image renderer and the k8s-sidecar) to their newest patch releases.
 
 ### Project
 
