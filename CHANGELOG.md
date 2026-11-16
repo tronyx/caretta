@@ -6,7 +6,9 @@ Releases are tagged `vX.Y.Z`; each one publishes the images `ghcr.io/tronyx/care
 
 ## Unreleased
 
-Nothing yet.
+### Changed
+
+- The image is built with Go 1.27.4, which fixes CVE-2026-97054 (GO-2026-6859) in Go's `net/http`. A race in the HTTP/1 server could crash it, and the agent serves its metrics and health probes with that server, so a crash restarted the agent. The distroless base image is updated to Google's newest rebuild.
 
 ## [v0.2.2](https://github.com/tronyx/caretta/releases/tag/v0.2.2) · 2026-11-06
 
