@@ -63,3 +63,45 @@ jobs:
         run: |
           docker run --rm -v "$RUNNER_TEMP:/out" "$TRIVY" convert --quiet --format table \
             --severity CRITICAL --exit-code 1 /out/trivy.json
+
+  govulncheck:
+    # Trivy rates a new Go vulnerability by its CVSS score, which often doesn't exist yet. govulncheck
+    # instead fails on any known vulnerability that Caretta's code can reach, whatever its rating.
+    name: govulncheck on the newest release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check out the newest release
+        id: release
+        run: |
+          tag=$(git tag --list 'v*.*.*' --sort=-v:refname | head -n 1)
+          if [ -z "$tag" ]; then
+            echo "No release yet; nothing to check."
+          else
+            git checkout -q "$tag"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+      - name: Set up Docker Buildx
+        if: steps.release.outputs.tag != ''
+        uses: docker/setup-buildx-action@v4
+      - name: Build the release's builder stage
+        if: steps.release.outputs.tag != ''
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: builder
+          load: true
+          platforms: linux/amd64
+          cache-from: type=gha
+          tags: caretta:builder
+      # The builder stage has the release's Go version and its generated eBPF code, which govulncheck needs
+      - name: Run govulncheck
+        if: steps.release.outputs.tag != ''
+        run: |
+          docker run --rm -w /src caretta:builder \
+            go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
