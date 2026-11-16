@@ -6,7 +6,10 @@ Releases are tagged `vX.Y.Z`; each one publishes the images `ghcr.io/tronyx/care
 
 ## Unreleased
 
-Nothing yet.
+### Project
+
+- The weekly scan also runs govulncheck on the newest release, and fails when Caretta's code can reach a known Go vulnerability. Trivy rated the vulnerability fixed in v0.2.3 as unknown, because it had no CVSS score yet, so its scan passed. govulncheck would have caught it.
+- Dependabot version updates are now turned on as well. The change in v0.2.2 only turned on its alerts and security updates. Forks have version updates off by default, so none of the updates in `dependabot.yml` had run until now.
 
 ## [v0.2.3](https://github.com/tronyx/caretta/releases/tag/v0.2.3) · 2026-11-16
 
