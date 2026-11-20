@@ -10,6 +10,8 @@ Releases are tagged `vX.Y.Z`; each one publishes the images `ghcr.io/tronyx/care
 
 - The weekly scan also runs govulncheck on the newest release, and fails when Caretta's code can reach a known Go vulnerability. Trivy rated the vulnerability fixed in v0.2.3 as unknown, because it had no CVSS score yet, so its scan passed. govulncheck would have caught it.
 - Dependabot version updates are now turned on as well. The change in v0.2.2 only turned on its alerts and security updates. Forks have version updates off by default, so none of the updates in `dependabot.yml` had run until now.
+- The workflows refer to each action from Docker and to `helm/kind-action` by the SHA of its commit, with its version in a comment. A version tag can move to other code, but a SHA cannot. The actions run the same versions as before, and Dependabot updates the SHA and the comment together.
+- The release workflow gives the GitHub token and the user name to `helm registry login` through environment variables. Before, GitHub wrote them into the text of the script. zizmor reports this as a risk of template injection.
 
 ## [v0.2.3](https://github.com/tronyx/caretta/releases/tag/v0.2.3) · 2026-11-16
 
