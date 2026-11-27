@@ -34,6 +34,6 @@ FROM scratch AS integration-test
 COPY --from=integration-test-build /caretta-integration.test /
 
 # gcr.io/distroless/static-debian13 (root variant: attaching kprobes requires uid 0)
-FROM gcr.io/distroless/static-debian13@sha256:1a64f46364620465ef9e9a8f5413757dfdf22695e050bbfd7303eeaf17a59383
+FROM gcr.io/distroless/static-debian13@sha256:4c2cd1dee442c9a99924a378c7c126fac8fef14771579ef567c3f2bdd7a5122a
 COPY --from=builder /src/bin/caretta /caretta
 ENTRYPOINT ["/caretta"]
